@@ -33,17 +33,17 @@ void loop() {
 
                 //Received a zero set neutral
                 if(incomingByte == 48){
-                  throttle_servo.write(90);
+                  throttle_servo.writeMicroseconds(1000);
                 }
 
                 //Received a 1 set full forward
                 if(incomingByte == 49){
-                  throttle_servo.write(180);
+                  throttle_servo.writeMicroseconds(2000);
                 }
 
                 //Received a 2 set full reverse
                 if(incomingByte == 50){
-                  throttle_servo.write(0);
+                  throttle_servo.writeMicroseconds(1500);
                 }
                 
         }
