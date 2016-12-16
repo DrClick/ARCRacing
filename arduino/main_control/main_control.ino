@@ -14,13 +14,26 @@ void set_steer_angle(int angle){
 
 void set_throttle_position(int sp){
   //Add 1 to the position so that zero is actually 1. This seems to keep the ESC alive.
-  if(sp==0}{
-    sp = 1;
+  if(sp==0){
+    sp = 0;
   }
   
-  int map_throttle = map(sp, -100, 100, 0, 180);
-  throttle_servo.write(map_throttle);
+  int map_throttle = map(sp, -100, 100, 1000, 2000);
+  throttle_servo.writeMicroseconds(map_throttle);
 }
+
+
+void reverse(int sp){
+  set_throttle_position(-100);
+  delay(3000);
+  set_throttle_position(0);
+  delay(100);
+  int map_throttle = map(sp, 0, 100, -20, -100);
+  
+  set_throttle_position(map_throttle);
+}
+
+
 
 void sweep(){
   set_steer_angle(0);
@@ -41,18 +54,10 @@ void sweep(){
 void launch(){
   set_throttle_position(0);
   delay(100);
-
-  //head backwards for 400ms
-  for (int i=0;i>=-80;i--){
-    set_throttle_position(i);
-    delay(5);
-  }
-
-  //nail the gas
-  for (int i=-80;i<100;i+10){
-    set_throttle_position(i);
-    delay(2);
-  }
+  set_throttle_position(-50);
+  delay(100);
+  set_throttle_position(100);
+  delay(600);
 }
 
 
@@ -62,24 +67,22 @@ void setup() {
   
   delay(1);
   sweep();
-  delay(2000);
   launch();
-  delay(1000);
-
   //WHOAH stop this bad boy
-  set_throttle_position(0);
-  delay(2000);
+  set_throttle_position(-100);
+  delay(3000);
 }
 
 
 void loop() {
-  set_throttle_position(20);
+
   set_steer_angle(90);
-  delay(10000);
-  set_throttle_position(0);
-  delay(200);
-  set_throttle_position(-30);
-  delay(10000);
+  delay(10);
+  set_throttle_position(20);
+  delay(5000);
+  reverse(20);
+  delay(5000);
+  
   set_throttle_position(0);
   delay(1000);
   sweep();
