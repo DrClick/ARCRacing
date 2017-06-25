@@ -53,6 +53,13 @@ void set_steer_angle_manual(int sp){
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
 void set_throttle_position(int sp){
   int map_throttle = map(sp, -100, 100, 1000, 2000);
+  //set minimum is 1400 for reverse and 1550 for slow forward
+  if (map_throttle < 1400){
+    map_throttle = 1400;
+  }
+  if(map_throttle > 1550){
+    map_throttle = 1550;
+  }
   throttle_servo.writeMicroseconds(map_throttle);
 }
 
@@ -152,7 +159,7 @@ void loop() {
   while (!TX_found){
       //read in the from the controller
       throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
-      Serial.println(throttle_input);
+      //Serial.println(throttle_input);
 
       //toggle red led while waiting to arm
       toggle_LED(LED_RED, true);
@@ -180,13 +187,13 @@ void loop() {
         }
         toggle_LED(LED_GREEN, true);
 
-          //WARNING: Uncommenting this will lanuch the robot
-        launch();
+         //WARNING: Uncommenting this will lanuch the robot
+        //launch();
         //WHOAH stop this bad boy (NOTICE, setting the throttle position to -100 is full breaks, 
         //to go in reverse, use the reverse method
-        set_throttle_position(-100);
-        delay(3000);
-        set_throttle_position(20);
+        //set_throttle_position(-100);
+        //delay(3000);
+        set_throttle_position(10);
       }
   }//end while init transmitter
 
