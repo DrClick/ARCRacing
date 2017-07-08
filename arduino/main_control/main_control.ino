@@ -10,7 +10,6 @@ const int STEER_OUT = 9;
 const int STEER_BASE = 1475;
 const int STEER_MIN = 970;
 const int STEER_MAX = 1930;
-const int STEER_BIAS = 2; //set this to adjust steering
 
 const int THROTTLE_IN = 6;
 const int THROTTLE_OUT = 11;
@@ -21,15 +20,24 @@ const int THROTTLE_MAX = 1962;
 const int LED_GREEN = 2;
 const int LED_RED = 3;
 
-
+int _STEER_BIAS = 0; //set this to adjust steering
+int _GOVERNER = 1750; //cap the forward speed
 
 
 //servos
 Servo steering_servo;
 Servo throttle_servo;
 
-int steer_input;
-int throttle_input;
+int steer_input = STEER_BASE;
+int throttle_input = THROTTLE_BASE;
+
+int throttle_pos;
+int steering_angle;
+
+// Input commands
+String command = "";// a string to hold incoming data
+boolean command_complete = false;  // whether the string is complete
+
 
 //make sure we have a transmitter so that we can safety stop the car
 bool TX_found, TX_high, TX_low;
@@ -39,27 +47,31 @@ bool manual_mode = false;
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(int angle){
-  angle = angle + STEER_BIAS;
+  angle = angle + _STEER_BIAS;
+  steering_angle = angle;
   int map_angle = map(angle, -45, 45, 0, 180);
   steering_servo.write(map_angle);
 }
 
 //when using the transmitter, map the steering to the TX output
-void set_steer_angle_manual(int sp){  
+void set_steer_angle_manual(int sp){
   int map_angle = map(sp, STEER_MIN, STEER_MAX, -45, 45);
   set_steer_angle(map_angle);
 }
 
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
-void set_throttle_position(int sp){
-  int map_throttle = map(sp, -100, 100, 1000, 2000);
+void set_throttle_position(int pos){
+  throttle_pos = pos;
+  
+  int map_throttle = map(pos, -100, 100, 1000, 2000);
   //set minimum is 1400 for reverse and 1550 for slow forward
-  if (map_throttle < 1400){
-    map_throttle = 1400;
+  if (map_throttle < 1200){
+    map_throttle = 1200;
   }
-  if(map_throttle > 1550){
-    map_throttle = 1550;
+  if(map_throttle > _GOVERNER){
+    map_throttle = _GOVERNER;
   }
+
   throttle_servo.writeMicroseconds(map_throttle);
 }
 
@@ -100,17 +112,6 @@ void sweep(){
   delay(100);
 }
 
-//This method launches the vehicle off the start line!
-void launch(){
-  Serial.println("Vector79: launching (wish me luck)...");
-  set_throttle_position(0);
-  delay(100);
-  set_throttle_position(-50);
-  delay(100);
-  set_throttle_position(100);
-  delay(600);
-}
-
 void toggle_LED(int led, bool visable){
   if(visable){
     digitalWrite(led, HIGH);
@@ -118,14 +119,20 @@ void toggle_LED(int led, bool visable){
   else{
     digitalWrite(led, LOW);
   }
-
 }
 
 void enter_manual_mode(){
-  Serial.println("Vector79: Manual mode triggered from TX");
+  Serial.println("Vetor79: Manual mode triggered from TX");
   manual_mode = true;
   toggle_LED(LED_GREEN, false);
   toggle_LED(LED_RED, true);
+}
+
+void enter_auto_mode(){
+  Serial.println("Vetor79: Entering Auto mode");
+  manual_mode = false;
+  toggle_LED(LED_GREEN, true);
+  toggle_LED(LED_RED, false);
 }
 
 void setup() {
@@ -147,8 +154,11 @@ void setup() {
   
   delay(1);
   sweep();
-  Serial.println("Vector79: setup complete in 3s");
-  delay(3000);
+  Serial.println("Vector79: setup complete in 1s");
+  delay(1000);
+
+  // reserve 200 bytes for the inputString:
+  command.reserve(200);
 }
 
 
@@ -159,8 +169,7 @@ void loop() {
   while (!TX_found){
       //read in the from the controller
       throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
-      //Serial.println(throttle_input);
-
+     
       //toggle red led while waiting to arm
       toggle_LED(LED_RED, true);
       delay(10);
@@ -168,11 +177,11 @@ void loop() {
       delay(10);
 
       if(throttle_input > THROTTLE_MAX - 100){
-        Serial.println("HIGH RX");
+        Serial.println("Vector79: HIGH RX");
         TX_high = true;
       }
       if(throttle_input < THROTTLE_MIN  + 100){
-        Serial.println("LOW RX");
+        Serial.println("Vector79: LOW RX");
         TX_low = true;
       }
 
@@ -185,19 +194,13 @@ void loop() {
           toggle_LED(LED_GREEN, false);
           delay(80);
         }
-        toggle_LED(LED_GREEN, true);
-
-         //WARNING: Uncommenting this will lanuch the robot
-        //launch();
-        //WHOAH stop this bad boy (NOTICE, setting the throttle position to -100 is full breaks, 
-        //to go in reverse, use the reverse method
-        //set_throttle_position(-100);
-        //delay(3000);
-        set_throttle_position(10);
+        enter_auto_mode();
       }
   }//end while init transmitter
 
-  steer_input = pulseIn(STEER_IN, HIGH, 25000);
+  //buffer the steer input, its noisy
+  steer_input = (steer_input + pulseIn(STEER_IN, HIGH, 25000))/2;
+  
   throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
 
   //if ever the transmitter is used, go into manual mode
@@ -211,5 +214,84 @@ void loop() {
   if(manual_mode){
     set_steer_angle_manual(steer_input);
     set_throttle_position_manual(throttle_input);
+  }
+
+  //look for command
+  if (command_complete) {
+      //get out of manual mode
+      if(manual_mode && command == "AUTO"){
+        enter_auto_mode();
+        
+      }
+
+      if(!manual_mode){
+        //throttle
+        if(command.startsWith("T")){
+          command.replace("T", " ");
+          command.trim();
+          set_throttle_position(command.toInt());
+        }
+        
+        //steering
+        if(command.startsWith("S")){
+          command.replace("S", " ");
+          command.trim();
+          set_steer_angle(command.toInt());
+        }
+
+        //steering bias
+        if(command.startsWith("B")){
+          command.replace("B", " ");
+          command.trim();
+          _STEER_BIAS = command.toInt();
+        }
+
+        //governer
+        if(command.startsWith("G")){
+          command.replace("G", " ");
+          command.trim();
+          if(command.toInt() > THROTTLE_BASE){
+            _GOVERNER = command.toInt();
+          }
+        }
+
+        //manual mode
+        if(command.startsWith("M")){
+          enter_manual_mode();
+        }
+
+        
+      }
+      
+      Serial.println("RCV:" + command);
+      // clear the string:
+      command = "";
+      command_complete = false;
+  }
+  
+
+  //log the current state
+  Serial.println(String("V79 ") + throttle_pos + ":" + steering_angle);
+  delay(1);
+}
+
+/*
+  SerialEvent occurs whenever a new data comes in the
+ hardware serial RX.  This routine is run between each
+ time loop() runs, so using delay inside loop can delay
+ response.  Multiple bytes of data may be available.
+ */
+void serialEvent() {
+  while (Serial.available()) {
+    // get the new byte:
+    char inChar = (char)Serial.read();
+    // add it to the inputString:
+    command += inChar;
+    // if the incoming character is a newline, set a flag
+    // so the main loop can do something about it:
+    if (inChar == '\n') {
+      command.trim();
+      command_complete = true;
+    }
   }
 }
