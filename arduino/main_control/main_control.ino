@@ -47,8 +47,11 @@ bool manual_mode = false;
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(int angle){
-  angle = angle + _STEER_BIAS;
   steering_angle = angle;
+  //apply bias which accounts for physical issues, not model issues
+  //we dont want our intented steer angle (0 for straight) to 
+  //reflect any issue in physical bias of the car
+  angle = angle + _STEER_BIAS;
   int map_angle = map(angle, -45, 45, 0, 180);
   steering_servo.write(map_angle);
 }
@@ -199,9 +202,9 @@ void loop() {
   }//end while init transmitter
 
   //buffer the steer input, its noisy
-  steer_input = (steer_input + pulseIn(STEER_IN, HIGH, 25000))/2;
+  steer_input =(steer_input * 4 + pulseIn(STEER_IN, HIGH, 25000))/5;
   
-  throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
+  throttle_input = (throttle_input * 4 + pulseIn(THROTTLE_IN, HIGH, 25000))/5;
 
   //if ever the transmitter is used, go into manual mode
   if(!manual_mode){
@@ -272,7 +275,7 @@ void loop() {
 
   //log the current state
   Serial.println(String("V79 ") + throttle_pos + ":" + steering_angle);
-  delay(1);
+  delay(2);
 }
 
 /*
