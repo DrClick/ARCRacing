@@ -1,7 +1,7 @@
 /*
- * Be sure to first calibrate the ESC. This program controls a Traxxas Slash 2 wheel drive
- * with XL5 speed controller
- */
+   Be sure to first calibrate the ESC. This program controls a Traxxas Slash 2 wheel drive
+   with XL5 speed controller
+*/
 #include <Servo.h>
 
 
@@ -13,15 +13,15 @@ const int STEER_MAX = 1930;
 
 const int THROTTLE_IN = 6;
 const int THROTTLE_OUT = 11;
-const int THROTTLE_BASE = 1462;
-const int THROTTLE_MIN = 975;
-const int THROTTLE_MAX = 1962;
+const int THROTTLE_BASE = 1280;
+const int THROTTLE_MIN = 847;
+const int THROTTLE_MAX = 1710;
 
 const int LED_GREEN = 2;
 const int LED_RED = 3;
 
 int _STEER_BIAS = 0; //set this to adjust steering
-int _GOVERNER = 1750; //cap the forward speed
+int _GOVERNER = 1600; //cap the forward speed
 
 
 //servos
@@ -46,32 +46,33 @@ bool manual_mode = false;
 
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
-void set_steer_angle(int angle){
+void set_steer_angle(int angle) {
   steering_angle = angle;
   //apply bias which accounts for physical issues, not model issues
-  //we dont want our intented steer angle (0 for straight) to 
+  //we dont want our intented steer angle (0 for straight) to
   //reflect any issue in physical bias of the car
   angle = angle + _STEER_BIAS;
+
   int map_angle = map(angle, -45, 45, 0, 180);
   steering_servo.write(map_angle);
 }
 
 //when using the transmitter, map the steering to the TX output
-void set_steer_angle_manual(int sp){
+void set_steer_angle_manual(int sp) {
   int map_angle = map(sp, STEER_MIN, STEER_MAX, -45, 45);
   set_steer_angle(map_angle);
 }
 
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
-void set_throttle_position(int pos){
+void set_throttle_position(int pos) {
   throttle_pos = pos;
-  
+
   int map_throttle = map(pos, -100, 100, 1000, 2000);
   //set minimum is 1400 for reverse and 1550 for slow forward
-  if (map_throttle < 1200){
+  if (map_throttle < 1200) {
     map_throttle = 1200;
   }
-  if(map_throttle > _GOVERNER){
+  if (map_throttle > _GOVERNER) {
     map_throttle = _GOVERNER;
   }
 
@@ -79,35 +80,35 @@ void set_throttle_position(int pos){
 }
 
 //when using the transmitter, map the throttle to the TX output
-void set_throttle_position_manual(int sp){  
+void set_throttle_position_manual(int sp) {
   int map_throttle = map(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
   set_throttle_position(map_throttle);
 }
 
 
-//set a reverse speed, 3 second delay to make sure the vehicle is stopped, 
+//set a reverse speed, 3 second delay to make sure the vehicle is stopped,
 //range is 0 to 100 for min max reverse
-void reverse(int sp){
+void reverse(int sp) {
   set_throttle_position(-100);
   delay(3000);
   set_throttle_position(0);
   delay(100);
   int map_throttle = map(sp, 0, 100, -20, -100);
-  
+
   set_throttle_position(map_throttle);
 }
 
 
 //Sweeps the steering servo
-void sweep(){
+void sweep() {
   set_steer_angle(0);
   delay(100);
   //sweep steering
-  for(int i=-45;i<45;i++){
+  for (int i = -45; i < 45; i++) {
     set_steer_angle(i);
     delay(10);
   }
-  for(int i=45;i>=-45;i--){
+  for (int i = 45; i >= -45; i--) {
     set_steer_angle(i);
     delay(10);
   }
@@ -115,23 +116,23 @@ void sweep(){
   delay(100);
 }
 
-void toggle_LED(int led, bool visable){
-  if(visable){
+void toggle_LED(int led, bool visable) {
+  if (visable) {
     digitalWrite(led, HIGH);
   }
-  else{
+  else {
     digitalWrite(led, LOW);
   }
 }
 
-void enter_manual_mode(){
+void enter_manual_mode() {
   Serial.println("Vetor79: Manual mode triggered from TX");
   manual_mode = true;
   toggle_LED(LED_GREEN, false);
   toggle_LED(LED_RED, true);
 }
 
-void enter_auto_mode(){
+void enter_auto_mode() {
   Serial.println("Vetor79: Entering Auto mode");
   manual_mode = false;
   toggle_LED(LED_GREEN, true);
@@ -147,14 +148,14 @@ void setup() {
   pinMode(3, OUTPUT);
   toggle_LED(LED_GREEN, false);
   toggle_LED(LED_RED, true);
-  
+
   //read from the controller
   pinMode(5, INPUT);
   pinMode(6, INPUT);
-  
+
   steering_servo.attach(STEER_OUT);  // attaches the servo on pin 9 to the servo object
   throttle_servo.attach(THROTTLE_OUT);  // attaches the servo on pin 9 to the servo object
-  
+
   delay(1);
   sweep();
   Serial.println("Vector79: setup complete in 1s");
@@ -169,109 +170,109 @@ void setup() {
 void loop() {
 
   //loop until the transmitter is toggled full throttle forward and reverse
-  while (!TX_found){
-      //read in the from the controller
-      throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
-     
-      //toggle red led while waiting to arm
-      toggle_LED(LED_RED, true);
-      delay(10);
+  while (!TX_found) {
+    //read in the from the controller
+    throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
+
+    //toggle red led while waiting to arm
+    toggle_LED(LED_RED, true);
+    delay(10);
+    toggle_LED(LED_RED, false);
+    delay(10);
+
+    if (throttle_input > (THROTTLE_MAX - 100)) {
+      Serial.println("Vector79: HIGH RX");
+      TX_high = true;
+    }
+    if (throttle_input < (THROTTLE_MIN  + 100)) {
+      Serial.println("Vector79: LOW RX");
+      TX_low = true;
+    }
+
+    if (TX_low && TX_high) {
+      TX_found = true;
       toggle_LED(LED_RED, false);
-      delay(10);
-
-      if(throttle_input > THROTTLE_MAX - 100){
-        Serial.println("Vector79: HIGH RX");
-        TX_high = true;
+      for (int i = 0; i < 30; i++) {
+        toggle_LED(LED_GREEN, true);
+        delay(80);
+        toggle_LED(LED_GREEN, false);
+        delay(80);
       }
-      if(throttle_input < THROTTLE_MIN  + 100){
-        Serial.println("Vector79: LOW RX");
-        TX_low = true;
-      }
-
-      if(TX_low && TX_high){
-        TX_found = true;
-        toggle_LED(LED_RED, false);
-        for(int i=0;i<30;i++){
-          toggle_LED(LED_GREEN, true);
-          delay(80);
-          toggle_LED(LED_GREEN, false);
-          delay(80);
-        }
-        enter_auto_mode();
-      }
+      enter_auto_mode();
+    }
   }//end while init transmitter
 
   //buffer the steer input, its noisy
-  steer_input =(steer_input * 4 + pulseIn(STEER_IN, HIGH, 25000))/5;
-  
-  throttle_input = (throttle_input * 4 + pulseIn(THROTTLE_IN, HIGH, 25000))/5;
+  steer_input = (steer_input * 4 + pulseIn(STEER_IN, HIGH, 25000)) / 5;
+
+  throttle_input = (throttle_input + pulseIn(THROTTLE_IN, HIGH, 25000)) / 2;
 
   //if ever the transmitter is used, go into manual mode
-  if(!manual_mode){
-    if((abs(steer_input - STEER_BASE) > 100) || (abs(throttle_input - THROTTLE_BASE) > 100)){
+  if (!manual_mode) {
+    if ((abs(steer_input - STEER_BASE) > 100) || (abs(throttle_input - THROTTLE_BASE) > 100)) {
       enter_manual_mode();
     }
   }
 
 
-  if(manual_mode){
+  if (manual_mode) {
     set_steer_angle_manual(steer_input);
     set_throttle_position_manual(throttle_input);
   }
 
   //look for command
   if (command_complete) {
-      //get out of manual mode
-      if(manual_mode && command == "AUTO"){
-        enter_auto_mode();
-        
+    //get out of manual mode
+    if (manual_mode && command == "AUTO") {
+      enter_auto_mode();
+
+    }
+
+    if (!manual_mode) {
+      //throttle
+      if (command.startsWith("T")) {
+        command.replace("T", " ");
+        command.trim();
+        set_throttle_position(command.toInt());
       }
 
-      if(!manual_mode){
-        //throttle
-        if(command.startsWith("T")){
-          command.replace("T", " ");
-          command.trim();
-          set_throttle_position(command.toInt());
-        }
-        
-        //steering
-        if(command.startsWith("S")){
-          command.replace("S", " ");
-          command.trim();
-          set_steer_angle(command.toInt());
-        }
-
-        //steering bias
-        if(command.startsWith("B")){
-          command.replace("B", " ");
-          command.trim();
-          _STEER_BIAS = command.toInt();
-        }
-
-        //governer
-        if(command.startsWith("G")){
-          command.replace("G", " ");
-          command.trim();
-          if(command.toInt() > THROTTLE_BASE){
-            _GOVERNER = command.toInt();
-          }
-        }
-
-        //manual mode
-        if(command.startsWith("M")){
-          enter_manual_mode();
-        }
-
-        
+      //steering
+      if (command.startsWith("S")) {
+        command.replace("S", " ");
+        command.trim();
+        set_steer_angle(command.toInt());
       }
-      
-      Serial.println("RCV:" + command);
-      // clear the string:
-      command = "";
-      command_complete = false;
+
+      //steering bias
+      if (command.startsWith("B")) {
+        command.replace("B", " ");
+        command.trim();
+        _STEER_BIAS = command.toInt();
+      }
+
+      //governer
+      if (command.startsWith("G")) {
+        command.replace("G", " ");
+        command.trim();
+        if (command.toInt() > THROTTLE_BASE) {
+          _GOVERNER = command.toInt();
+        }
+      }
+
+      //manual mode
+      if (command.startsWith("M")) {
+        enter_manual_mode();
+      }
+
+
+    }
+
+    Serial.println("RCV:" + command);
+    // clear the string:
+    command = "";
+    command_complete = false;
   }
-  
+
 
   //log the current state
   Serial.println(String("V79 ") + throttle_pos + ":" + steering_angle);
@@ -280,10 +281,10 @@ void loop() {
 
 /*
   SerialEvent occurs whenever a new data comes in the
- hardware serial RX.  This routine is run between each
- time loop() runs, so using delay inside loop can delay
- response.  Multiple bytes of data may be available.
- */
+  hardware serial RX.  This routine is run between each
+  time loop() runs, so using delay inside loop can delay
+  response.  Multiple bytes of data may be available.
+*/
 void serialEvent() {
   while (Serial.available()) {
     // get the new byte:

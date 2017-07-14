@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 2.8.3)
 project(vector79)
 # Find the catkin build system, and any other packages on 
 # which we depend.
-find_package(catkin REQUIRED COMPONENTS roscpp )
+find_package(catkin REQUIRED COMPONENTS roscpp std_msgs rospy)
 # Declare our catkin package. 
 catkin_package()
 # Specify locations of header files. 
