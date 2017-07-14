@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/thomas/code/ARCRacing/ros_system_ws/devel/setup.sh
