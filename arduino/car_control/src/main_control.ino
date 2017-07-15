@@ -139,14 +139,14 @@ void toggle_LED(int led, bool visable) {
 }
 
 void enter_manual_mode() {
-  Serial.println("Vetor79: Manual mode triggered from TX");
+  Serial.println("V79: Manual mode triggered from TX");
   manual_mode = true;
   toggle_LED(LED_GREEN, false);
   toggle_LED(LED_RED, true);
 }
 
 void enter_auto_mode() {
-  Serial.println("Vetor79: Entering Auto mode");
+  Serial.println("V79: Entering Auto mode");
   manual_mode = false;
   toggle_LED(LED_GREEN, true);
   toggle_LED(LED_RED, false);
@@ -154,7 +154,7 @@ void enter_auto_mode() {
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("Vector79: starting...");
+  Serial.println("V79: starting...");
 
   //set up red/green led indicators
   pinMode(2, OUTPUT);
@@ -171,7 +171,7 @@ void setup() {
 
   delay(1);
   sweep();
-  Serial.println("Vector79: setup complete in 1s");
+  Serial.println("V79: setup complete in 1s");
   delay(1000);
 
   // reserve 200 bytes for the inputString:
