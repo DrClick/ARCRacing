@@ -4,7 +4,7 @@ from std_msgs.msg import String
 import serial
 
 #setup serial port
-ser = serial.Serial('/dev/ttyACM0')
+ser = serial.Serial('/dev/ttyACM0', 115200, timeout=.1)
 
 
 def bus_comm():

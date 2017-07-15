@@ -55,6 +55,7 @@ void set_steer_angle(int angle) {
   }
   
   steering_angle = angle;
+  Serial.println(String("V79-S:") + steering_angle);
   
   //apply bias which accounts for physical issues, not model issues
   //we dont want our intented steer angle (0 for straight) to
@@ -79,6 +80,7 @@ void set_throttle_position(int pos) {
   }
   
   throttle_pos = pos;
+  Serial.println(String("V79-T:") + throttle_pos);
 
   int map_throttle = map(pos, -100, 100, 1000, 2000);
   //set minimum is 1400 for reverse and 1550 for slow forward
@@ -153,7 +155,7 @@ void enter_auto_mode() {
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("V79: starting...");
 
   //set up red/green led indicators
@@ -285,10 +287,6 @@ void loop() {
     command = "";
     command_complete = false;
   }
-
-
-  //log the current state
-  Serial.println(String("V79 ") + throttle_pos + ":" + steering_angle);
 }
 
 /*

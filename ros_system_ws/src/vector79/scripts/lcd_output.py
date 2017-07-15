@@ -29,7 +29,7 @@ lcd.message("Vector79: ROS")
 def callback(data):
     rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
     lcd.set_cursor(0, 1)
-    m =  ' '.join(data.data.split(" ")[1:]).ljust(20)[:20]
+    m =  ' '.join(data.data.split(" ")[1:])[:20]
     lcd.message(m)
 
 def lcd_output():
