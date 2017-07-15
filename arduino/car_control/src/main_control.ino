@@ -7,15 +7,17 @@
 
 const int STEER_IN = 5;
 const int STEER_OUT = 9;
-const int STEER_BASE = 1475;
-const int STEER_MIN = 970;
-const int STEER_MAX = 1930;
+const int STEER_BASE = 1277;
+const int STEER_MIN = 847;
+const int STEER_MAX = 1710;
+const float STEER_SENSITIVITY = 1.0;
 
 const int THROTTLE_IN = 6;
 const int THROTTLE_OUT = 11;
-const int THROTTLE_BASE = 1280;
+const int THROTTLE_BASE = 1277;
 const int THROTTLE_MIN = 847;
 const int THROTTLE_MAX = 1710;
+const float THROTTLE_SENSITIVITY = 1.0;
 
 const int LED_GREEN = 2;
 const int LED_RED = 3;
@@ -28,8 +30,8 @@ int _GOVERNER = 1600; //cap the forward speed
 Servo steering_servo;
 Servo throttle_servo;
 
-int steer_input = STEER_BASE;
-int throttle_input = THROTTLE_BASE;
+float steer_input = STEER_BASE;
+float throttle_input = THROTTLE_BASE;
 
 int throttle_pos;
 int steering_angle;
@@ -47,7 +49,13 @@ bool manual_mode = false;
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(int angle) {
+  //dont set unless a delta has been acheived
+  if (abs(steering_angle - angle) / 2.0 < STEER_SENSITIVITY){
+    return;
+  }
+  
   steering_angle = angle;
+  
   //apply bias which accounts for physical issues, not model issues
   //we dont want our intented steer angle (0 for straight) to
   //reflect any issue in physical bias of the car
@@ -58,13 +66,18 @@ void set_steer_angle(int angle) {
 }
 
 //when using the transmitter, map the steering to the TX output
-void set_steer_angle_manual(int sp) {
-  int map_angle = map(sp, STEER_MIN, STEER_MAX, -45, 45);
+void set_steer_angle_manual(float sp) {
+  int map_angle = map(int(sp), STEER_MIN, STEER_MAX, -45, 45);
   set_steer_angle(map_angle);
 }
 
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
 void set_throttle_position(int pos) {
+  //dont set unless a delta has been acheived
+  if (abs(throttle_pos - pos)/2.0 < THROTTLE_SENSITIVITY){
+    return;
+  }
+  
   throttle_pos = pos;
 
   int map_throttle = map(pos, -100, 100, 1000, 2000);
@@ -80,8 +93,8 @@ void set_throttle_position(int pos) {
 }
 
 //when using the transmitter, map the throttle to the TX output
-void set_throttle_position_manual(int sp) {
-  int map_throttle = map(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
+void set_throttle_position_manual(float sp) {
+  int map_throttle = map(int(sp), THROTTLE_MIN, THROTTLE_MAX, -100, 100);
   set_throttle_position(map_throttle);
 }
 
@@ -203,9 +216,9 @@ void loop() {
   }//end while init transmitter
 
   //buffer the steer input, its noisy
-  steer_input = (steer_input * 4 + pulseIn(STEER_IN, HIGH, 25000)) / 5;
+  steer_input = (steer_input * 9 + pulseIn(STEER_IN, HIGH, 25000)) / 10.0;
 
-  throttle_input = (throttle_input + pulseIn(THROTTLE_IN, HIGH, 25000)) / 2;
+  throttle_input = (throttle_input * 4 + pulseIn(THROTTLE_IN, HIGH, 25000)) / 5.0;
 
   //if ever the transmitter is used, go into manual mode
   if (!manual_mode) {
@@ -276,7 +289,6 @@ void loop() {
 
   //log the current state
   Serial.println(String("V79 ") + throttle_pos + ":" + steering_angle);
-  delay(2);
 }
 
 /*
