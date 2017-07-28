@@ -14,16 +14,18 @@ const float STEER_SENSITIVITY = 1.0;
 
 const int THROTTLE_IN = 6;
 const int THROTTLE_OUT = 11;
-const int THROTTLE_BASE = 1277;
-const int THROTTLE_MIN = 847;
+const int THROTTLE_BASE = 1273;
+const int THROTTLE_MIN = 843;
 const int THROTTLE_MAX = 1710;
 const float THROTTLE_SENSITIVITY = 1.0;
 
-const int LED_GREEN = 2;
+const int LED_GREEN = 4;
 const int LED_RED = 3;
 
+const int RPM_INTERRUPT = 0; //pin 2
+
 int _STEER_BIAS = 0; //set this to adjust steering
-int _GOVERNER = 1600; //cap the forward speed
+int _GOVERNER = 1710; //cap the forward speed
 
 
 //servos
@@ -44,6 +46,11 @@ boolean command_complete = false;  // whether the string is complete
 //make sure we have a transmitter so that we can safety stop the car
 bool TX_found, TX_high, TX_low;
 bool manual_mode = false;
+
+//rpm monitoring
+volatile byte half_revolutions;
+unsigned int rpm;
+unsigned long timeold;
 
 
 
@@ -154,19 +161,24 @@ void enter_auto_mode() {
   toggle_LED(LED_RED, false);
 }
 
+void monitor_rpm(){
+  half_revolutions++;
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("V79: starting...");
+  attachInterrupt(RPM_INTERRUPT, monitor_rpm, RISING);
 
   //set up red/green led indicators
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
   toggle_LED(LED_GREEN, false);
   toggle_LED(LED_RED, true);
 
   //read from the controller
-  pinMode(5, INPUT);
-  pinMode(6, INPUT);
+  pinMode(STEER_IN, INPUT);
+  pinMode(THROTTLE_IN, INPUT);
 
   steering_servo.attach(STEER_OUT);  // attaches the servo on pin 9 to the servo object
   throttle_servo.attach(THROTTLE_OUT);  // attaches the servo on pin 9 to the servo object
@@ -175,6 +187,11 @@ void setup() {
   sweep();
   Serial.println("V79: setup complete in 1s");
   delay(1000);
+
+  //init rpm
+  half_revolutions = 0;
+  rpm = 0;
+  timeold = 0;
 
   // reserve 200 bytes for the inputString:
   command.reserve(200);
@@ -218,9 +235,9 @@ void loop() {
   }//end while init transmitter
 
   //buffer the steer input, its noisy
-  steer_input = (steer_input * 9 + pulseIn(STEER_IN, HIGH, 25000)) / 10.0;
+  steer_input = (steer_input + pulseIn(STEER_IN, HIGH, 25000)) / 2.0;
 
-  throttle_input = (throttle_input * 4 + pulseIn(THROTTLE_IN, HIGH, 25000)) / 5.0;
+  throttle_input = (throttle_input + pulseIn(THROTTLE_IN, HIGH, 25000)) / 2.0;
 
   //if ever the transmitter is used, go into manual mode
   if (!manual_mode) {
@@ -286,6 +303,15 @@ void loop() {
     // clear the string:
     command = "";
     command_complete = false;
+  }
+  
+
+  //RPMs
+  if (half_revolutions >= 20) {
+     rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
+     timeold = millis();
+     half_revolutions = 0;
+     Serial.println(String("V79-R:") + String(rpm));
   }
 }
 
