@@ -4,28 +4,34 @@
 */
 #include <Servo.h>
 
+#define STEER_IN 5
+#define STEER_OUT 9
+#define STEER_BASE 1277
+#define STEER_MIN 847
+#define STEER_MAX 1710
+#define STEER_SENSITIVITY 1.2
 
-const int STEER_IN = 5;
-const int STEER_OUT = 9;
-const int STEER_BASE = 1277;
-const int STEER_MIN = 847;
-const int STEER_MAX = 1710;
-const float STEER_SENSITIVITY = 1.0;
+#define THROTTLE_IN 6
+#define THROTTLE_OUT 11
+#define THROTTLE_BASE 1273
+#define THROTTLE_MIN 843
+#define THROTTLE_MAX 1710
+#define THROTTLE_SENSITIVITY 3.0
 
-const int THROTTLE_IN = 6;
-const int THROTTLE_OUT = 11;
-const int THROTTLE_BASE = 1273;
-const int THROTTLE_MIN = 843;
-const int THROTTLE_MAX = 1710;
-const float THROTTLE_SENSITIVITY = 1.0;
+#define LED_GREEN 4
+#define LED_RED 3
 
-const int LED_GREEN = 4;
-const int LED_RED = 3;
+#define RPM_PIN 2
+#define RPM_INTERRUPT 0
 
-const int RPM_INTERRUPT = 0; //pin 2
+// left and right sonar trigger at the same time
+#define TRIGGER_PIN     7   
+#define ECHO_PIN_LEFT   8
+#define ECHO_PIN_RIGHT  12
 
 int _STEER_BIAS = 0; //set this to adjust steering
-int _GOVERNER = 1710; //cap the forward speed
+int _GOVERNER_F = 10; //cap the forward speed
+int _GOVERNER_R = -12;
 
 
 //servos
@@ -52,13 +58,27 @@ volatile byte half_revolutions;
 unsigned int rpm;
 unsigned long timeold;
 
+//reverse
+bool in_reverse = false;
+
 
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(int angle) {
   //dont set unless a delta has been acheived
   if (abs(steering_angle - angle) / 2.0 < STEER_SENSITIVITY){
-    return;
+    if (abs(angle) <= 2){
+      angle = 0;
+    }
+    else {
+      //not a big of change to change noise
+      return;
+    }
+
+    //if this value has already been set zero, no reason to set it again
+    if (steering_angle == 0) {
+      return;
+    }
   }
   
   steering_angle = angle;
@@ -83,20 +103,45 @@ void set_steer_angle_manual(float sp) {
 void set_throttle_position(int pos) {
   //dont set unless a delta has been acheived
   if (abs(throttle_pos - pos)/2.0 < THROTTLE_SENSITIVITY){
-    return;
+    if (abs(pos) <= 5){
+      pos = 0;
+    }
+    else {
+      //not a big of change to change noise
+      return;
+    }
+
+    //if this value has already been set zero, no reason to set it again
+    if (throttle_pos == 0) {
+      return;
+    }
   }
   
+
+  //determine if in reverse
+  if (pos > 0){
+    in_reverse = false;
+  }
+  else if (throttle_pos == 0){
+    //only go in reverse if the throttle was zero
+    in_reverse = true;
+  }
+
+
+  //dont allow input past the limits, note we only limit reverse if the 
+  //standing throttle position is at zero. This allows for full breaking
+  if (in_reverse){
+    pos = max(_GOVERNER_R, pos);
+  }
+  
+  pos = min(_GOVERNER_F, pos);
+
   throttle_pos = pos;
   Serial.println(String("V79-T:") + throttle_pos);
 
+  //note!!!!! the 1000 and 2000 here are the min and max PWM that the controller accepts
   int map_throttle = map(pos, -100, 100, 1000, 2000);
-  //set minimum is 1400 for reverse and 1550 for slow forward
-  if (map_throttle < 1200) {
-    map_throttle = 1200;
-  }
-  if (map_throttle > _GOVERNER) {
-    map_throttle = _GOVERNER;
-  }
+  
 
   throttle_servo.writeMicroseconds(map_throttle);
 }
@@ -169,6 +214,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("V79: starting...");
   attachInterrupt(RPM_INTERRUPT, monitor_rpm, RISING);
+  digitalWrite(RPM_PIN, HIGH);
 
   //set up red/green led indicators
   pinMode(LED_GREEN, OUTPUT);
@@ -282,12 +328,12 @@ void loop() {
         _STEER_BIAS = command.toInt();
       }
 
-      //governer
-      if (command.startsWith("G")) {
-        command.replace("G", " ");
+      //governer forward
+      if (command.startsWith("GF")) {
+        command.replace("GF", " ");
         command.trim();
-        if (command.toInt() > THROTTLE_BASE) {
-          _GOVERNER = command.toInt();
+        if (command.toInt() > 0) {
+          _GOVERNER_F = command.toInt();
         }
       }
 
