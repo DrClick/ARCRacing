@@ -14,22 +14,22 @@
 #define STEER_SENSITIVITY 1.2
 
 #define THROTTLE_IN 6
-#define THROTTLE_OUT 11
+#define THROTTLE_OUT 10
 #define THROTTLE_BASE 1273
 #define THROTTLE_MIN 843
 #define THROTTLE_MAX 1710
 #define THROTTLE_SENSITIVITY 3.0
 
-#define LED_GREEN 4
-#define LED_RED 3
+#define LED_GREEN 7
+#define LED_RED 8
 
 #define RPM_PIN 2
 #define RPM_INTERRUPT 0
 #define ROLLING_RPM 400
 
 // left and right sonar trigger at the same time
-#define TRIGGER_PIN     7   
-#define ECHO_PIN_LEFT   8
+#define TRIGGER_PIN     3   
+#define ECHO_PIN_LEFT   4
 #define ECHO_PIN_RIGHT  12
 
 //sonar (centimeters)
