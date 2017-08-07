@@ -4,6 +4,7 @@
 */
 #include <Servo.h>
 #include <NewPing.h>
+#include <CmdMessenger.h>
 
 #define STEER_IN 5
 #define STEER_OUT 9
@@ -13,7 +14,7 @@
 #define STEER_SENSITIVITY 1.2
 
 #define THROTTLE_IN 6
-#define THROTTLE_OUT 11
+#define THROTTLE_OUT 10
 #define THROTTLE_BASE 1273
 #define THROTTLE_MIN 843
 #define THROTTLE_MAX 1710
@@ -35,13 +36,25 @@
 #define SONAR_NUM     2 // Number of sensors.
 #define MAX_DISTANCE 200 // Maximum distance (in cm) to ping.
 
+bool is_logging = false;
 
-
-
-
+/* Define available CmdMessenger commands */
+enum {
+    cmd_steer,
+    cmd_throttle,
+    cmd_rpm,
+    cmd_sonar,
+    cmd_toggle_ebrake,
+    cmd_govern_forward,
+    cmd_govern_reverse,
+    cmd_set_mode,
+    cmd_set_steer_bias,
+    cmd_info
+};
+CmdMessenger commander = CmdMessenger(Serial,',',';','/');
 
 int _STEER_BIAS = 0; //set this to adjust steering
-int _GOVERNER_F = 100; //cap the forward speed
+int _GOVERNER_F = 10; //cap the forward speed
 int _GOVERNER_R = -12;
 
 
@@ -54,10 +67,6 @@ float throttle_input = THROTTLE_BASE;
 
 int throttle_pos;
 int steering_angle;
-
-// Input commands
-String command = "";// a string to hold incoming data
-boolean command_complete = false;  // whether the string is complete
 
 
 //make sure we have a transmitter so that we can safety stop the car
@@ -102,7 +111,7 @@ void set_steer_angle(int angle) {
   }
   
   steering_angle = angle;
-  Serial.println(String("V79-S:") + steering_angle);
+  commander.sendBinCmd(cmd_steer,steering_angle);
   
   //apply bias which accounts for physical issues, not model issues
   //we dont want our intented steer angle (0 for straight) to
@@ -147,13 +156,13 @@ void set_throttle_position(int pos) {
   pos = min(_GOVERNER_F, pos);
 
   throttle_pos = pos;
-  Serial.println(String("V79-T:") + throttle_pos);
+  commander.sendBinCmd(cmd_throttle, throttle_pos);
 
   //note!!!!! the 1000 and 2000 here are the min and max PWM that the controller accepts
   int map_throttle = map(pos, -100, 100, 1000, 2000);
   
 
-  throttle_servo.writeMicroseconds(map_throttle);
+  //throttle_servo.writeMicroseconds(map_throttle);
 }
 
 //when using the transmitter, map the throttle to the TX output
@@ -203,14 +212,14 @@ void toggle_LED(int led, bool visable) {
 }
 
 void enter_manual_mode() {
-  Serial.println("V79: Manual mode triggered from TX");
+  commander.sendCmd(cmd_info, "Manual mode triggered from TX");
   manual_mode = true;
   toggle_LED(LED_GREEN, false);
   toggle_LED(LED_RED, true);
 }
 
 void enter_auto_mode() {
-  Serial.println("V79: Entering Auto mode");
+  commander.sendCmd(cmd_info, "Entering Auto mode");
   manual_mode = false;
   toggle_LED(LED_GREEN, true);
   toggle_LED(LED_RED, false);
@@ -220,7 +229,7 @@ void enter_auto_mode() {
 }
 
 void enter_arming_mode(){
-  Serial.println("V79: Please arm transmitter by toggleing full left, and right");
+  commander.sendCmd(cmd_info, "Please arm transmitter by toggeleing full left and right!!!");
   TX_found = false;
   TX_high = false;
   TX_low = false;
@@ -228,6 +237,9 @@ void enter_arming_mode(){
   while (!TX_found) {
     //read in the from the controller
     steer_input = pulseIn(STEER_IN, HIGH, 25000);
+    throttle_input = pulseIn(STEER_IN, HIGH, 25000);
+    Serial.println('S', steer_input);
+    //Serial.println('T', throttle_input);
 
     //toggle red led while waiting to arm
     toggle_LED(LED_RED, true);
@@ -235,12 +247,12 @@ void enter_arming_mode(){
     toggle_LED(LED_RED, false);
     delay(10);
 
-    if (steer_input > (STEER_MAX - 100)) {
-      Serial.println("Vector79: LEFT RX");
+    if (steer_input > (STEER_MAX - 100) && !TX_high) {
+      commander.sendCmd(cmd_info, "LEFT RX");
       TX_high = true;
     }
-    if (steer_input < (STEER_MIN  + 100)) {
-      Serial.println("Vector79: RIGHT RX");
+    if (steer_input < (STEER_MIN  + 100) && !TX_low) {
+      commander.sendCmd(cmd_info, "RIGHT RX");
       TX_low = true;
     }
 
@@ -265,7 +277,7 @@ void monitor_rpm(){
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("V79: starting...");
+  commander.sendCmd(cmd_info, "starting...");
   attachInterrupt(RPM_INTERRUPT, monitor_rpm, RISING);
   digitalWrite(RPM_PIN, HIGH);
 
@@ -284,7 +296,7 @@ void setup() {
 
   delay(1);
   sweep();
-  Serial.println("V79: setup complete in 1s");
+  commander.sendCmd(cmd_info, "setup complete in 1s");
   delay(1000);
 
   //init rpm
@@ -292,8 +304,8 @@ void setup() {
   rpm = 0;
   timeold = 0;
 
-  // reserve 200 bytes for the inputString:
-  command.reserve(200);
+
+  attach_commander_callbacks(); 
 
   enter_arming_mode();
 }
@@ -301,6 +313,10 @@ void setup() {
 
 
 void loop() {
+
+  //look for commands
+  commander.feedinSerialData();
+
   //buffer the inputs, from the controller, they are noisy
   steer_input = (steer_input + pulseIn(STEER_IN, HIGH, 25000)) / 2.0;
   throttle_input = (throttle_input + pulseIn(THROTTLE_IN, HIGH, 25000)) / 2.0;
@@ -312,78 +328,65 @@ void loop() {
     }
   }
   else {
-    set_steer_angle_manual(steer_input);
-    set_throttle_position_manual(throttle_input);
+    //set_steer_angle_manual(steer_input);
+    Serial.println('S', steer_input);
+    //set_throttle_position_manual(throttle_input);
+    Serial.println('T', throttle_input);
   }
 
-  //listen for commands
-  liten_for_commands();
-
   //output rpms
-  write_rpms();
+  //write_rpms();
 
   //ping sonars
-  ping_sonars();
+  //ping_sonars();
 
   //emergency breaking
-  if (emergency_breaking) monitor_for_emergency_stop();
+  //if (emergency_breaking) monitor_for_emergency_stop();
   
 }
 
-void liten_for_commands(){
-  ///COMMANDS
-  ///
-  if (command_complete) {
-    //get out of manual mode
-    if (manual_mode && command == "AUTO") {
-      enter_auto_mode();
 
-    }
+//commander callbacks
+void on_cmd_steer(void){
+    if(!manual_mode) set_steer_angle(commander.readBinArg<int>());
+}
 
-    if (!manual_mode) {
-      //throttle
-      if (command.startsWith("T")) {
-        command.replace("T", " ");
-        command.trim();
-        set_throttle_position(command.toInt());
-      }
+void on_cmd_throttle(void){
+    if(!manual_mode) set_throttle_position(commander.readBinArg<int>());
+}
 
-      //steering
-      if (command.startsWith("S")) {
-        command.replace("S", " ");
-        command.trim();
-        set_steer_angle(command.toInt());
-      }
+void on_cmd_toggle_ebrake(void){
+  emergency_breaking = commander.readBinArg<bool>();
+}
 
-      //steering bias
-      if (command.startsWith("B")) {
-        command.replace("B", " ");
-        command.trim();
-        _STEER_BIAS = command.toInt();
-      }
+void on_cmd_govern_forward(void){
+  int max_throttle = commander.readBinArg<int>();
+  if(max_throttle > 0 && max_throttle <= 100) _GOVERNER_F = max_throttle;
+}
 
-      //governer forward
-      if (command.startsWith("GF")) {
-        command.replace("GF", " ");
-        command.trim();
-        if (command.toInt() > 0) {
-          _GOVERNER_F = command.toInt();
-        }
-      }
+void on_cmd_govern_reverse(void){
+  int max_throttle = commander.readBinArg<int>();
+  if(max_throttle < 0 && max_throttle >= -100) _GOVERNER_R = max_throttle;
+}
 
-      //manual mode
-      if (command.startsWith("M")) {
-        enter_manual_mode();
-      }
+void on_cmd_set_mode(void){
+  if (commander.readBinArg<bool>()) enter_auto_mode();
+  else enter_manual_mode();
+}
 
+void on_cmd_set_steer_bias(void){
+  _STEER_BIAS = commander.readBinArg<int>();
+}
 
-    }
-
-    Serial.println("RCV:" + command);
-    // clear the string:
-    command = "";
-    command_complete = false;
-  }
+/* Attach callbacks for CmdMessenger commands */
+void attach_commander_callbacks(void) {
+    commander.attach(cmd_steer, on_cmd_steer);
+    commander.attach(cmd_throttle, on_cmd_throttle);
+    commander.attach(cmd_toggle_ebrake, on_cmd_toggle_ebrake);
+    commander.attach(cmd_govern_forward, on_cmd_govern_forward);
+    commander.attach(cmd_govern_reverse, on_cmd_govern_reverse);
+    commander.attach(cmd_set_mode, on_cmd_set_mode);
+    commander.attach(cmd_set_steer_bias, on_cmd_set_steer_bias);
 }
 
 void write_rpms(){
@@ -393,7 +396,7 @@ void write_rpms(){
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
      timeold = millis();
      half_revolutions = 0;
-     Serial.println(String("V79-R:") + String(rpm));
+     if (is_logging) commander.sendBinCmd(cmd_rpm, rpm);
   }
 }
 
@@ -402,14 +405,24 @@ void ping_sonars(){
     int reading = sonar[0].ping_cm();
     if (reading > 0){
       sonar_distance[0] = reading;
-      Serial.println(String("V79-PL:") + sonar_distance[0] );
+      if (is_logging){
+        commander.sendCmdStart(cmd_sonar);
+        commander.sendCmdBinArg(0);
+        commander.sendCmdBinArg(sonar_distance[0]);
+        commander.sendCmdEnd();
+      }
     }
   }
   if(pingTimer % 4 == 2) {
     int reading = sonar[1].ping_cm();
     if (reading > 0){
       sonar_distance[1] = reading;
-      Serial.println(String("V79-PR:") + sonar_distance[1] );
+      if (is_logging){
+        commander.sendCmdStart(cmd_sonar);
+        commander.sendCmdBinArg(1);
+        commander.sendCmdBinArg(sonar_distance[1]);
+        commander.sendCmdEnd();
+      }
     }
   }
   pingTimer++;
@@ -418,11 +431,11 @@ void ping_sonars(){
 void monitor_for_emergency_stop(){
   if ((sonar_distance[0] + sonar_distance[1])/2 <=  min(120, (40 + rpm/10)) && 
     rpm >= ROLLING_RPM) {
-    Serial.println("OH SHIT");
-    Serial.println(String("  --RPM: ") + rpm);
-    Serial.println(String("  --TP: ") + throttle_pos);
-    Serial.println(String("  --LP: ") + sonar_distance[0]);
-    Serial.println(String("  --RP: ") + sonar_distance[1]);
+    commander.sendCmd(cmd_info, "OH SHIT");
+    commander.sendCmd(cmd_info, String("  --RPM: ") + rpm);
+    commander.sendCmd(cmd_info, String("  --TP: ") + throttle_pos);
+    commander.sendCmd(cmd_info, String("  --LP: ") + sonar_distance[0]);
+    commander.sendCmd(cmd_info, String("  --RP: ") + sonar_distance[1]);
 
     //emergency break
     set_throttle_position(-100);
@@ -432,27 +445,5 @@ void monitor_for_emergency_stop(){
 
     //require arming
     // enter_arming_mode();
-  }
-}
-
-
-/*
-  SerialEvent occurs whenever a new data comes in the
-  hardware serial RX.  This routine is run between each
-  time loop() runs, so using delay inside loop can delay
-  response.  Multiple bytes of data may be available.
-*/
-void serialEvent() {
-  while (Serial.available()) {
-    // get the new byte:
-    char inChar = (char)Serial.read();
-    // add it to the inputString:
-    command += inChar;
-    // if the incoming character is a newline, set a flag
-    // so the main loop can do something about it:
-    if (inChar == '\n') {
-      command.trim();
-      command_complete = true;
-    }
   }
 }
