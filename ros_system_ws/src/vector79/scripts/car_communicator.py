@@ -44,8 +44,8 @@ def callback(data):
         commander.send("cmd_steer", steer_angle)
 
     if(m.startswith("V79-M")):
-        steer_angle = int(m.split(":")[1])
-        commander.send("cmd_steer", steer_angle)
+        mode = int(m.split(":")[1])
+        commander.send("cmd_set_mode", mode)
 
 def read_from_pi(_commander):
     pub = rospy.Publisher('bus_comm', String, queue_size=10000)
