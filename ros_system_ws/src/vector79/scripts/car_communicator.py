@@ -2,26 +2,36 @@
 import rospy
 from std_msgs.msg import String
 import  PyCmdMessenger
-import ArduinoBoard
+from ArduinoBoard import ArduinoBoard
 import threading
 
 # Initialize an ArduinoBoard instance.  This is where you specify baud rate and
 # serial timeout.  If you are using a non ATmega328 board, you might also need
 # to set the data sizes (bytes for integers, longs, floats, and doubles).  
-arduino = ArduinoBoard("/dev/ttyUSB0", baud_rate=115200)
+arduino = ArduinoBoard("/dev/ttyUSB0", baud_rate=115200, timeout=1)
 
 commands = [
-    ["cmd_steer", "i"],
-    ["cmd_throttle", "i"],
-    ["cmd_rpm", "i"],
-    ["cmd_sonar", "ii"],
-    ["cmd_toggle_ebrake", "?"],
-    ["cmd_govern_forward", "i"],
-    ["cmd_govern_reverse", "i"],
-    ["cmd_set_mode", "?"],
-    ["cmd_set_steer_bias", "i"],
-    ["cmd_info", "s"]
+    ["cmd_steer", "i"],             # TO / FROM CAR
+    ["cmd_throttle", "i"],          # TO / FROM CAR
+    ["cmd_rpm", "i"],               # FROM CAR
+    ["cmd_sonar", "ii"],            # FROM CAR
+    ["cmd_toggle_ebrake", "?"],     # TO CAR
+    ["cmd_govern_forward", "i"],    # TO CAR
+    ["cmd_govern_reverse", "i"],    # TO CAR
+    ["cmd_set_mode", "?"],          # TO CAR
+    ["cmd_set_steer_bias", "i"],    # TO CAR
+    ["cmd_info", "s"],              # FROM CAR
+    ["cmd_voltage", "d"]            # FROM CAR
 ]
+
+commands_to_bus_code = {
+    "cmd_steer":        "STR",
+    "cmd_throttle":     "THR",
+    "cmd_rpm":          "RPM",
+    "cmd_sonar":        "USR",
+    "cmd_info":         "INF",
+    "cmd_voltage":      "VLT"
+}
 # Initialize the messenger
 commander = PyCmdMessenger.CmdMessenger(arduino, commands)
 
@@ -50,8 +60,19 @@ def callback(data):
 def read_from_pi(_commander):
     pub = rospy.Publisher('bus_comm', String, queue_size=10000)
     while True:
-        # publish the commands received
-        pub.publish(commander.receive())
+        # publish the commands received if a command was received
+        raw_command = commander.receive()
+        if raw_command is None:
+            continue
+
+        command, values, time = raw_command
+
+        if command in commands_to_bus_code:
+            bus_code = commands_to_bus_code[command]
+            msg_values = ",".join([str(x) for x in values])
+            message = "{}:{}".format(bus_code, msg_values)
+            print(message)
+            pub.publish(message)
 
 
 def car_communicator():

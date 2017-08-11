@@ -32,15 +32,18 @@ def callback(data):
 
 def write_lcd(message_type, message):
     prepend_char = {
-        "V79-T": "T",#TODO: Remove these, legacy from 1st run
-        "THR": "T",
-        "V79-S": "S",#TODO: Remove these, legacy from 1st run
-        "STR": "S",
-        "IP": "I",
-        "TMP": "P",
-        "VLT": "V",
-        "M_1": "1",
-        "M_2": "2"
+        "V79-T":    "T",#TODO: Remove these, legacy from 1st run
+        "THR":      "T",
+        "V79-S":    "S",#TODO: Remove these, legacy from 1st run
+        "STR":      "S",
+        "IP":       "I",
+        "TMP":      "P",
+        "VLT":      "V",
+        "M_1":      "1",
+        "WRN":      "1",
+        "INF":      "2",
+        "M_2":      "2",
+        "RPM":      "R",
     }
 
     if message_type in prepend_char:
