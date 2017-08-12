@@ -49,7 +49,8 @@ enum {
     cmd_govern_reverse,
     cmd_set_mode,
     cmd_set_steer_bias,
-    cmd_info
+    cmd_info,
+    cmd_voltage
 };
 CmdMessenger commander = CmdMessenger(Serial,',',';','/');
 
@@ -162,7 +163,7 @@ void set_throttle_position(int pos) {
   int map_throttle = map(pos, -100, 100, 1000, 2000);
   
 
-  //throttle_servo.writeMicroseconds(map_throttle);
+  throttle_servo.writeMicroseconds(map_throttle);
 }
 
 //when using the transmitter, map the throttle to the TX output
@@ -335,14 +336,8 @@ void loop() {
   }
 
   //output rpms
-  //write_rpms();
-
-  //ping sonars
-  //ping_sonars();
-
-  //emergency breaking
-  //if (emergency_breaking) monitor_for_emergency_stop();
-  
+  write_rpms();
+ 
 }
 
 
@@ -400,50 +395,22 @@ void write_rpms(){
   }
 }
 
-void ping_sonars(){
-  if(pingTimer % 4 == 0) {
-    int reading = sonar[0].ping_cm();
-    if (reading > 0){
-      sonar_distance[0] = reading;
-      if (is_logging){
-        commander.sendCmdStart(cmd_sonar);
-        commander.sendCmdBinArg(0);
-        commander.sendCmdBinArg(sonar_distance[0]);
-        commander.sendCmdEnd();
-      }
-    }
-  }
-  if(pingTimer % 4 == 2) {
-    int reading = sonar[1].ping_cm();
-    if (reading > 0){
-      sonar_distance[1] = reading;
-      if (is_logging){
-        commander.sendCmdStart(cmd_sonar);
-        commander.sendCmdBinArg(1);
-        commander.sendCmdBinArg(sonar_distance[1]);
-        commander.sendCmdEnd();
-      }
-    }
-  }
-  pingTimer++;
-}
+// void monitor_for_emergency_stop(){
+//   if ((sonar_distance[0] + sonar_distance[1])/2 <=  min(120, (40 + rpm/10)) && 
+//     rpm >= ROLLING_RPM) {
+//     commander.sendCmd(cmd_info, "OH SHIT");
+//     commander.sendCmd(cmd_info, String("  --RPM: ") + rpm);
+//     commander.sendCmd(cmd_info, String("  --TP: ") + throttle_pos);
+//     commander.sendCmd(cmd_info, String("  --LP: ") + sonar_distance[0]);
+//     commander.sendCmd(cmd_info, String("  --RP: ") + sonar_distance[1]);
 
-void monitor_for_emergency_stop(){
-  if ((sonar_distance[0] + sonar_distance[1])/2 <=  min(120, (40 + rpm/10)) && 
-    rpm >= ROLLING_RPM) {
-    commander.sendCmd(cmd_info, "OH SHIT");
-    commander.sendCmd(cmd_info, String("  --RPM: ") + rpm);
-    commander.sendCmd(cmd_info, String("  --TP: ") + throttle_pos);
-    commander.sendCmd(cmd_info, String("  --LP: ") + sonar_distance[0]);
-    commander.sendCmd(cmd_info, String("  --RP: ") + sonar_distance[1]);
+//     //emergency break
+//     set_throttle_position(-100);
+//     delay(3000);
+//     set_throttle_position(0);
+//     rpm = 0;
 
-    //emergency break
-    set_throttle_position(-100);
-    delay(3000);
-    set_throttle_position(0);
-    rpm = 0;
-
-    //require arming
-    // enter_arming_mode();
-  }
-}
+//     //require arming
+//     // enter_arming_mode();
+//   }
+// }

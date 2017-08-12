@@ -38,23 +38,21 @@ commander = PyCmdMessenger.CmdMessenger(arduino, commands)
 print("--------CAR COMMUNICATOR-----------")
 
 
-def callback(data):
+def cmd_callback(data):
     print('Car command RCVD:', data)
     rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
-    m =  ''.join(data.data.split(" ")[1:])
-    rospy.loginfo(rospy.get_caller_id() + '%s', m)
+    m =  data.data
 
-
-    if(m.startswith("V79-T")):
+    if(m.startswith("THR")):
         throttle_pos = int(m.split(":")[1])
         commander.send("cmd_throttle", throttle_pos)
 
-    if(m.startswith("V79-S")):
+    if(m.startswith("STR")):
         steer_angle = int(m.split(":")[1])
         commander.send("cmd_steer", steer_angle)
 
-    if(m.startswith("V79-M")):
-        mode = int(m.split(":")[1])
+    if(m.startswith("MOD")):
+        mode = True if m.split(":")[1] == "true" else False
         commander.send("cmd_set_mode", mode)
 
 def read_from_pi(_commander):
@@ -84,7 +82,7 @@ def car_communicator():
     # run simultaneously.
     rospy.init_node('car_communicator')
     rospy.loginfo(rospy.get_caller_id() + '%s', "car communication started")
-    rospy.Subscriber('car_command', String, callback)
+    rospy.Subscriber('car_command', String, cmd_callback)
 
     
     listener_thread = threading.Thread(target = read_from_pi, args=[commander])
