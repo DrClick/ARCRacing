@@ -54,7 +54,7 @@ enum {
 CmdMessenger commander = CmdMessenger(Serial,',',';','/');
 
 int _STEER_BIAS = 0; //set this to adjust steering
-int _GOVERNER_F = 10; //cap the forward speed
+int _GOVERNER_F = 50; //cap the forward speed
 int _GOVERNER_R = -12;
 
 
@@ -162,7 +162,7 @@ void set_throttle_position(int pos) {
   int map_throttle = map(pos, -100, 100, 1000, 2000);
   
 
-  //throttle_servo.writeMicroseconds(map_throttle);
+  throttle_servo.writeMicroseconds(map_throttle);
 }
 
 //when using the transmitter, map the throttle to the TX output
@@ -335,7 +335,7 @@ void loop() {
   }
 
   //output rpms
-  //write_rpms();
+  write_rpms();
 
   //ping sonars
   //ping_sonars();
