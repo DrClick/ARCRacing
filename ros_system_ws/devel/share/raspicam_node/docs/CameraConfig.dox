@@ -1,0 +1,18 @@
+\subsubsection parameters ROS parameters
+
+Reads and maintains the following parameters on the ROS server
+
+- \b "~contrast" : \b [int] Contrast min: -100, default: 0, max: 100
+- \b "~sharpness" : \b [int] Sharpness min: -100, default: 0, max: 100
+- \b "~brightness" : \b [int] Brightness min: 0, default: 50, max: 100
+- \b "~saturation" : \b [int] Saturation min: 0, default: 0, max: 100
+- \b "~ISO" : \b [int] ISO min: 100, default: 400, max: 1600
+- \b "~exposureCompensation" : \b [int] exposureCompensation min: -10, default: 0, max: 10
+- \b "~videoStabilisation" : \b [bool] videoStabilisation min: False, default: False, max: True
+- \b "~vFlip" : \b [bool] vFlip min: False, default: False, max: True
+- \b "~hFlip" : \b [bool] hFlip min: False, default: False, max: True
+- \b "~shutterSpeed" : \b [int] shutterSpeed min: 0, default: 10000, max: 100000
+- \b "~zoom" : \b [double] Digital zoom min: 1.0, default: 1.0, max: 4.0
+- \b "~exposure_mode" : \b [str] Exposure mode min: , default: auto, max: 
+- \b "~awb_mode" : \b [str] AWB mode min: , default: auto, max: 
+

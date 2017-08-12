@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="vector79" type="lcd_output.py" name="lcd_output"/>
+    <node pkg="raspicam" type="raspicam_node" name="camera"/>
+</launch>

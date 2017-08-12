@@ -71,7 +71,7 @@ def create_model():
 
 
 model=create_model()
-model.load_weights("data_model_tranfered_2.h5")
+model.load_weights("model.h5")
 
 print("starting to predict 1000 frames")
 start = datetime.now()
