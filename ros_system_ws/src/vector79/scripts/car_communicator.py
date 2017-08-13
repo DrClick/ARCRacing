@@ -55,22 +55,31 @@ def cmd_callback(data):
         mode = True if m.split(":")[1] == "true" else False
         commander.send("cmd_set_mode", mode)
 
+    if(m.startswith("GFW")):
+        governer = int(m.split(":")[1])
+        commander.send("cmd_govern_forward", governer)
+
 def read_from_pi(_commander):
     pub = rospy.Publisher('bus_comm', String, queue_size=10000)
     while True:
         # publish the commands received if a command was received
-        raw_command = commander.receive()
-        if raw_command is None:
-            continue
+        try:
+            raw_command = commander.receive()
+            if raw_command is None:
+                continue
 
-        command, values, time = raw_command
+            command, values, time = raw_command
 
-        if command in commands_to_bus_code:
-            bus_code = commands_to_bus_code[command]
-            msg_values = ",".join([str(x) for x in values])
-            message = "{}:{}".format(bus_code, msg_values)
-            print(message)
-            pub.publish(message)
+            if command in commands_to_bus_code:
+                bus_code = commands_to_bus_code[command]
+                msg_values = ",".join([str(x) for x in values])
+                message = "{}:{}".format(bus_code, msg_values)
+                
+                if bus_code == "RPM":
+                    print("RPM FOUND", message)
+                pub.publish(message)
+        except:
+            pass
 
 
 def car_communicator():

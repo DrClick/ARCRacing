@@ -76,7 +76,6 @@ model.load_weights("model.h5")
 print("starting to predict 1000 frames")
 start = datetime.now()
 for i in range(1000):
-    print(np.array([X_train[i % 20]]).shape)
     predicted = model.predict(np.array([X_train[i % 20]]))[0]
 end = datetime.now()
 print("elapsed time: ", (end - start).total_seconds())
