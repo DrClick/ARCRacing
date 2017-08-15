@@ -137,7 +137,7 @@ def create_model():
 
         return model
 model = create_model()
-model.load_weights("//home/nvidia/code/ARCRacing/ros_system_ws/src/vector79/scripts/model.h5")
+model.load_weights("//home/nvidia/code/ARCRacing/models/model_sim_1_run_main_track_forward.h5")
 graph = tf.get_default_graph()
 
 

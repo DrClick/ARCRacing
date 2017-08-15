@@ -15,8 +15,16 @@ class BagExtractor():
     data_topic = "bus_comm"
     output = []
     image_counter = 0
-    current_steer = 0
-    current_throttle = 0
+    current_values = {
+        "STR": 0,
+        "THR": 0,
+        "UFR": 0,
+        "UFL": 0,
+        "ACC": [0,0,0],
+        "GYR": [0,0,0],
+        "MAG": [0,0,0],
+        "PRH": [0,0,0]
+    }
 
     # Must have __init__(self) function for a class, similar to a C++ class constructor.
     def __init__(self):
@@ -26,6 +34,7 @@ class BagExtractor():
         rospy.loginfo("Bag filename = %s", self.bag_file)
 
         self.bridge = CvBridge()
+        self.output.append("|".join(["image_id"] + self.current_values.keys() + ["time"]))
 
     def extract_and_sync(self):
         # Open bag file.
@@ -37,16 +46,15 @@ class BagExtractor():
                 
                 #read in the sensor data
                 if topic_parts[1] == 'bus_comm':
-                    steer_index = msg.data.find("V79-S:")
-                    if steer_index > -1:
-                        self.current_steer = msg.data[steer_index + 6:].strip()
-
-                    throttle_index = msg.data.find("V79-T:")
-                    if throttle_index > -1:
-                        self.current_throttle = msg.data[throttle_index + 6:].strip()
+                    
+                    bus_code, bus_value = msg.data.split(":")
+                    if bus_code in self.current_values:
+                        self.current_values[bus_code] = bus_value.strip()
+                        # print(bus_code, bus_value.strip())
 
                 if topic_parts[1] == 'camera' and topic_parts[2] == "image":
-                    entry = [str(self.image_counter), str(self.current_throttle), str(self.current_steer), str(t.to_nsec())]
+                    values = [str(x) for x in self.current_values.values()]
+                    entry = "|".join([str(self.image_counter)] + values + [str(t.to_nsec())])
                     self.output.append(entry)
                     
                     try:

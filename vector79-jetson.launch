@@ -1,4 +1,5 @@
 <launch>
     <node pkg="vector79" type="car_communicator.py" name="car_communicator"/>
     <node pkg="vector79" type="US_9DoF_listener.py" name="US_9DoF_listener"/>
+    <node pkg="vector79" type="pilot.py" name="pilot"/>
 </launch>
