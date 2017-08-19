@@ -71,7 +71,7 @@ class BagExtractor():
         #write the output
         with open(self.output_dir + "/_data.csv", 'w') as f:
             for i in self.output:
-                print(i)
+                #print(i)
                 f.write("{}\n".format(",".join(i)))
 # Main function.    
 if __name__ == '__main__':
