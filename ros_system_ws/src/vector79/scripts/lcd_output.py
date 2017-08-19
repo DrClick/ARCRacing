@@ -31,24 +31,24 @@ def callback(data):
     write_lcd(message_type, message)
 
 def write_lcd(message_type, message):
-    prepend_char = {
-        "V79-T":    "T",#TODO: Remove these, legacy from 1st run
-        "THR":      "T",
-        "V79-S":    "S",#TODO: Remove these, legacy from 1st run
-        "STR":      "S",
-        "IP":       "I",
-        "TMP":      "P",
-        "VLT":      "V",
-        "M_1":      "1",
-        "WRN":      "1",
-        "INF":      "2",
-        "M_2":      "2",
-        "RPM":      "R",
+    formatting = {
+        "V79-T":    ["T", 4],#TODO: Remove these, legacy from 1st run
+        "THR":      ["T", 4],
+        "V79-S":    ["S", 4],#TODO: Remove these, legacy from 1st run
+        "STR":      ["S", 4],
+        "IP":       ["I", 20],
+        "TMP":      ["P", 2],
+        "VLT":      ["V", 3],
+        "M_1":      ["1", 20] ,
+        "WRN":      ["1", 20],
+        "INF":      ["2", 20],
+        "M_2":      ["2", 20],
+        "RPM":      ["R", 5],
     }
 
-    if message_type in prepend_char:
-        output = "{} - {}\n".format(prepend_char[message_type], message)
-        print(output)
+    if message_type in formatting:
+        prepend_char, message_length = formatting[message_type]
+        output = "{} - {}\n".format(prepend_char, message.rjust(message_length))
         _serial.write(output)
         time.sleep(.01)
 
