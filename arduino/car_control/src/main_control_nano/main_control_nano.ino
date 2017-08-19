@@ -8,16 +8,16 @@
 
 #define STEER_IN 5
 #define STEER_OUT 9
-#define STEER_BASE 1277
-#define STEER_MIN 847
-#define STEER_MAX 1710
+#define STEER_BASE 1465
+#define STEER_MIN 965
+#define STEER_MAX 1965
 #define STEER_SENSITIVITY 1.2
 
 #define THROTTLE_IN 6
 #define THROTTLE_OUT 10
-#define THROTTLE_BASE 1273
-#define THROTTLE_MIN 843
-#define THROTTLE_MAX 1710
+#define THROTTLE_BASE 1465
+#define THROTTLE_MIN 965
+#define THROTTLE_MAX 1965
 #define THROTTLE_SENSITIVITY 3.0
 
 #define LED_GREEN 4
@@ -55,7 +55,7 @@ enum {
 CmdMessenger commander = CmdMessenger(Serial,',',';','/');
 
 int _STEER_BIAS = 0; //set this to adjust steering
-int _GOVERNER_F = 10; //cap the forward speed
+int _GOVERNER_F = 20; //cap the forward speed
 int _GOVERNER_R = -12;
 
 
@@ -238,9 +238,9 @@ void enter_arming_mode(){
   while (!TX_found) {
     //read in the from the controller
     steer_input = pulseIn(STEER_IN, HIGH, 25000);
-    throttle_input = pulseIn(STEER_IN, HIGH, 25000);
-    Serial.println('S', steer_input);
-    //Serial.println('T', throttle_input);
+    throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
+    //Serial.println(steer_input);
+    Serial.println(throttle_input);
 
     //toggle red led while waiting to arm
     toggle_LED(LED_RED, true);
@@ -324,15 +324,13 @@ void loop() {
 
   //if ever the transmitter is used, go into manual mode
   if (!manual_mode) {
-    if ((abs(steer_input - STEER_BASE) > 200) || (abs(throttle_input - THROTTLE_BASE) > 200)) {
+    if ((abs(steer_input - STEER_BASE) > 250) || (abs(throttle_input - THROTTLE_BASE) > 250)) {
       enter_manual_mode();
     }
   }
   else {
-    //set_steer_angle_manual(steer_input);
-    Serial.println('S', steer_input);
-    //set_throttle_position_manual(throttle_input);
-    Serial.println('T', throttle_input);
+    set_steer_angle_manual(steer_input);
+    set_throttle_position_manual(throttle_input);
   }
 
   //output rpms
@@ -385,8 +383,6 @@ void attach_commander_callbacks(void) {
 }
 
 void write_rpms(){
-  ///RPMs
-  ///
   if (half_revolutions >= 6) {
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
      timeold = millis();
