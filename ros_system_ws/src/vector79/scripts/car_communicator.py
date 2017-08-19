@@ -38,41 +38,48 @@ commander = PyCmdMessenger.CmdMessenger(arduino, commands)
 print("--------CAR COMMUNICATOR-----------")
 
 
-def callback(data):
+def cmd_callback(data):
     print('Car command RCVD:', data)
     rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
-    m =  ''.join(data.data.split(" ")[1:])
-    rospy.loginfo(rospy.get_caller_id() + '%s', m)
+    m =  data.data
 
-
-    if(m.startswith("V79-T")):
+    if(m.startswith("THR")):
         throttle_pos = int(m.split(":")[1])
         commander.send("cmd_throttle", throttle_pos)
 
-    if(m.startswith("V79-S")):
+    if(m.startswith("STR")):
         steer_angle = int(m.split(":")[1])
         commander.send("cmd_steer", steer_angle)
 
-    if(m.startswith("V79-M")):
-        mode = int(m.split(":")[1])
+    if(m.startswith("MOD")):
+        mode = True if m.split(":")[1] == "true" else False
         commander.send("cmd_set_mode", mode)
+
+    if(m.startswith("GFW")):
+        governer = int(m.split(":")[1])
+        commander.send("cmd_govern_forward", governer)
 
 def read_from_pi(_commander):
     pub = rospy.Publisher('bus_comm', String, queue_size=10000)
     while True:
         # publish the commands received if a command was received
-        raw_command = commander.receive()
-        if raw_command is None:
-            continue
+        try:
+            raw_command = commander.receive()
+            if raw_command is None:
+                continue
 
-        command, values, time = raw_command
+            command, values, time = raw_command
 
-        if command in commands_to_bus_code:
-            bus_code = commands_to_bus_code[command]
-            msg_values = ",".join([str(x) for x in values])
-            message = "{}:{}".format(bus_code, msg_values)
-            print(message)
-            pub.publish(message)
+            if command in commands_to_bus_code:
+                bus_code = commands_to_bus_code[command]
+                msg_values = ",".join([str(x) for x in values])
+                message = "{}:{}".format(bus_code, msg_values)
+                
+                if bus_code == "RPM":
+                    print("RPM FOUND", message)
+                pub.publish(message)
+        except:
+            pass
 
 
 def car_communicator():
@@ -84,7 +91,7 @@ def car_communicator():
     # run simultaneously.
     rospy.init_node('car_communicator')
     rospy.loginfo(rospy.get_caller_id() + '%s', "car communication started")
-    rospy.Subscriber('car_command', String, callback)
+    rospy.Subscriber('car_command', String, cmd_callback)
 
     
     listener_thread = threading.Thread(target = read_from_pi, args=[commander])
