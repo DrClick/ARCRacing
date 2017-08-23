@@ -36,7 +36,7 @@
 #define SONAR_NUM     2 // Number of sensors.
 #define MAX_DISTANCE 200 // Maximum distance (in cm) to ping.
 
-bool is_logging = false;
+bool is_logging = true;
 
 /* Define available CmdMessenger commands */
 enum {
@@ -240,7 +240,7 @@ void enter_arming_mode(){
     steer_input = pulseIn(STEER_IN, HIGH, 25000);
     throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
     //Serial.println(steer_input);
-    Serial.println(throttle_input);
+    //Serial.println(throttle_input);
 
     //toggle red led while waiting to arm
     toggle_LED(LED_RED, true);
@@ -387,7 +387,7 @@ void write_rpms(){
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
      timeold = millis();
      half_revolutions = 0;
-     if (is_logging) commander.sendBinCmd(cmd_rpm, rpm);
+     commander.sendBinCmd(cmd_rpm, rpm);
   }
 }
 
