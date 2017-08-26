@@ -84,9 +84,15 @@ int rpm_decay;
 //emergency breaking
 bool emergency_breaking = false;
 
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+ return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(float angle) {
   steering_angle = angle;
+  Serial.print(steering_angle);
   commander.sendBinCmd(cmd_steer,steering_angle);
 
   
@@ -101,7 +107,7 @@ void set_steer_angle(float angle) {
 
 //when using the transmitter, map the steering to the TX output
 void set_steer_angle_manual(float sp) {
-  float map_angle = map(sp, STEER_MIN, STEER_MAX, -45.0, 45.0);
+  float map_angle = mapfloat(sp, STEER_MIN, STEER_MAX, -45.0, 45.0);
   set_steer_angle(map_angle);
 }
 
@@ -128,25 +134,7 @@ void set_throttle_position(float pos) {
 
 //when using the transmitter, map the throttle to the TX output
 void set_throttle_position_manual(float sp) {
-  
-//  //dont set unless a delta has been acheived
-//  if (abs(throttle_pos - pos)/2.0 < THROTTLE_SENSITIVITY){
-//    if (abs(pos) <= 5){
-//      pos = 0;
-//    }
-//    else {
-//      //not a big of change to change noise
-//      return;
-//    }
-//
-//    //if this value has already been set zero, no reason to set it again
-//    if (throttle_pos == 0) {
-//      return;
-//    }
-//  }
-
-  
-  float map_throttle = map(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
+  float map_throttle = mapfloat(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
   set_throttle_position(map_throttle);
 }
 
