@@ -21,7 +21,7 @@ def get_temp():
 
 
 #TODO: figure out how to figure out this port programatically
-_serial = serial.Serial('/dev/ttyUSB0', 115200, timeout=.1)
+_serial = serial.Serial('/dev/ttyUSB1', 115200, timeout=.1)
 time.sleep(5)
 
 def callback(data):
@@ -32,9 +32,7 @@ def callback(data):
 
 def write_lcd(message_type, message):
     formatting = {
-        "V79-T":    ["T", 4],#TODO: Remove these, legacy from 1st run
         "THR":      ["T", 4],
-        "V79-S":    ["S", 4],#TODO: Remove these, legacy from 1st run
         "STR":      ["S", 4],
         "IP":       ["I", 20],
         "TMP":      ["P", 2],
