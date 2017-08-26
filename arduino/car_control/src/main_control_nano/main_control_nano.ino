@@ -318,13 +318,12 @@ void loop() {
   write_rpms();
 
   //decay rpms incase vehicle has stopped
-  if (rpm_decay >=2){
-    rpm_decay = int(rpm_decay/2);
-    if (rpm_decay < 2){
-      rpm = 0;
-      commander.sendBinCmd(cmd_rpm, rpm);
-     }
-  }
+  rpm_decay++;
+  if (rpm_decay >100){
+    rpm = 0;
+    rpm_decay = 0;
+    commander.sendBinCmd(cmd_rpm, rpm);
+   }
  
 
   
@@ -378,7 +377,7 @@ void attach_commander_callbacks(void) {
 void write_rpms(){
   if (half_revolutions >= 2) {
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
-     rpm_decay = rpm;
+     rpm_decay = 0;
      timeold = millis();
      half_revolutions = 0;
      commander.sendBinCmd(cmd_rpm, rpm);
