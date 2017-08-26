@@ -92,7 +92,6 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(float angle) {
   steering_angle = angle;
-  Serial.print(steering_angle);
   commander.sendBinCmd(cmd_steer,steering_angle);
 
   
