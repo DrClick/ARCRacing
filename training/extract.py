@@ -49,6 +49,10 @@ class BagExtractor():
                 topic_parts = topic.split('/')
                 
                 #read in the sensor data
+                if len(topic_parts) < 2:
+                    print(topic, msg)
+                    continue
+
                 if topic_parts[1] == 'bus_comm':
                     
                     bus_code, bus_value = msg.data.split(":")
