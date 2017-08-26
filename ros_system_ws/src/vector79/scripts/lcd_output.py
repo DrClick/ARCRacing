@@ -39,7 +39,7 @@ def write_lcd(message_type, message):
         "WRN":      ["1", 20],
         "INF":      ["2", 20],
         "M_2":      ["2", 20],
-        # "RPM":      ["R", 4],
+        "RPM":      ["R", 4],
     }
 
     if message_type in formatting:
@@ -55,16 +55,8 @@ def write_lcd(message_type, message):
 
 
 def lcd_output():
-
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
-    rospy.init_node('lcd_output', anonymous=True)
-
+    rospy.init_node('lcd_output')
     rospy.Subscriber('bus_comm', String, callback)
-
 
     write_lcd("M_2", "vector-79 pi ROS online")
     write_lcd("IP", "p" + get_ip_address())

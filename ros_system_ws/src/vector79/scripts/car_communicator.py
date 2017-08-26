@@ -47,11 +47,11 @@ def cmd_callback(data):
     m =  data.data
 
     if(m.startswith("THR")):
-        throttle_pos = int(m.split(":")[1])
+        throttle_pos = float(m.split(":")[1])
         commander.send("cmd_throttle", throttle_pos)
 
     if(m.startswith("STR")):
-        steer_angle = int(m.split(":")[1])
+        steer_angle = float(m.split(":")[1])
         commander.send("cmd_steer", steer_angle)
 
     if(m.startswith("MOD")):
@@ -81,7 +81,7 @@ def read_from_pi(_commander):
       
         bus_code = commands_to_bus_code[command]
         msg_values = ",".join([str(x) for x in values])
-        message = "{}:{}".format(bus_code, msg_values)
+        
         
         #print("DEBUG", bus_code, msg_values, message)
         
@@ -92,13 +92,16 @@ def read_from_pi(_commander):
         elif bus_code == "STR":
             velocity = Twist()
             velocity.angular.z = float(msg_values)
+            msg_values = int(velocity.angular.z)
             twist_pub.publish(velocity)
 
         elif bus_code == "THR":
             velocity = Twist()
             velocity.linear.x = float(msg_values)
+            msg_values = int(velocity.linear.x)
             twist_pub.publish(velocity)
-           
+        
+        message = "{}:{}".format(bus_code, msg_values)
         info_pub.publish(message)
             
 
@@ -111,19 +114,13 @@ def get_input_voltage():
         info_pub("VLT:{}".format(round(input_voltage,2)))
 
 def car_communicator():
-
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
     rospy.init_node('car_communicator')
     rospy.loginfo(rospy.get_caller_id() + '%s', "car communication started")
     rospy.Subscriber('car_command', String, cmd_callback)
 
     
     listener_thread = threading.Thread(target = read_from_pi, args=[commander])
-     print "Starting car communicator"
+    print ("Starting car communicator")
     listener_thread.start()
 
 

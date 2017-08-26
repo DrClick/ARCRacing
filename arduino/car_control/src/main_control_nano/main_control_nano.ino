@@ -320,11 +320,11 @@ void loop() {
 
 //commander callbacks
 void on_cmd_steer(void){
-    if(!manual_mode) set_steer_angle(commander.readBinArg<int>());
+    if(!manual_mode) set_steer_angle(commander.readBinArg<float>());
 }
 
 void on_cmd_throttle(void){
-    if(!manual_mode) set_throttle_position(commander.readBinArg<int>());
+    if(!manual_mode) set_throttle_position(commander.readBinArg<float>());
 }
 
 void on_cmd_toggle_ebrake(void){

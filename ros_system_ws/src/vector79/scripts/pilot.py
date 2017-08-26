@@ -14,7 +14,7 @@ from keras.models import Sequential
 from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
-
+from scipy.misc import imsave
 import pickle
 
 from time import time
@@ -31,7 +31,7 @@ class Pilot:
         rospy.Subscriber('/car_command', String, self.car_command_callback)
         rospy.Subscriber("/camera/image/compressed", CompressedImage, self.camera_callback, queue_size = 1)
 
-        self.command_publisher = rospy.Publisher('car_command', String, queue_size=10000)
+        self.command_publisher = rospy.Publisher('car_command', String, queue_size=10)
 
         rospy.loginfo("Enable Auto mode to start pilot")
         # spin() simply keeps python from exiting until this node is stopped
@@ -42,8 +42,10 @@ class Pilot:
 
     #the image pipeline to apply before processing
     def pipeline(self, img):
-        output = img[200:361,:,:]
-        return  cv2.resize(output, (0,0), fx=0.5, fy=0.5)
+        output = img[100:180,:,:]
+        output = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
+        return output
+        # return  cv2.resize(output, (0,0), fx=0.5, fy=0.5)
 
 
     def car_command_callback(self, data):
@@ -68,7 +70,8 @@ class Pilot:
             self.rpm = -1
 
 
-
+        if not self.autonomous_mode:
+            return
         # try and set rpms to 100. If its above 100, set throttle to zero, if below set to 8
         #slow down for corners
         if m.startswith("RPM"):
@@ -78,10 +81,10 @@ class Pilot:
 
             if self.rpm < target_rpm:
                 message = "THR:8"
-                #self.command_publisher.publish(message)
+                self.command_publisher.publish(message)
             else:
-                message = "THR:0"
-                #self.command_publisher.publish(message)
+                message = "THR:4"
+                self.command_publisher.publish(message)
 
 
     def camera_callback(self, data):
@@ -91,6 +94,8 @@ class Pilot:
 
         raw_image = self.cv_bridge.compressed_imgmsg_to_cv2(data, "bgr8")
         image_to_predict_on = self.pipeline(raw_image)
+        #imsave("predict.jpg", image_to_predict_on)
+
 
         #create a batch of size 1
         predict_batch = image_to_predict_on[None,:,:,:]
@@ -101,7 +106,7 @@ class Pilot:
         global graph
         with graph.as_default():
 
-            predicted_steering_angle = int(model.predict(predict_batch)[0][0] * max_steering_angle)
+            predicted_steering_angle = model.predict(predict_batch)[0][0] * max_steering_angle
 
         #wrte this to the command bux
         message = "STR:{}".format(predicted_steering_angle)
@@ -109,9 +114,9 @@ class Pilot:
 
 
         #start the car rolling
-        #if self.rpm == -1:
-            #self.rpm = 0
-            #self.command_publisher.publish("THR:8")
+        if self.rpm == -1:
+            self.rpm = 0
+            self.command_publisher.publish("THR:8")
         
         
 
@@ -163,8 +168,9 @@ def create_model():
         model.compile(loss="mse", optimizer="adam")
 
         return model
+
 model = create_model()
-model.load_weights("//home/nvidia/code/ARCRacing/models/office_set_2_5.h5")
+model.load_weights("/home/nvidia/code/ARCRacing/models/office_set_0_12.h5")
 graph = tf.get_default_graph()
 
 
