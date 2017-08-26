@@ -54,7 +54,7 @@ enum {
 };
 CmdMessenger commander = CmdMessenger(Serial,',',';','/');
 
-int _STEER_BIAS = 0; //set this to adjust steering
+float _STEER_BIAS = 0.0; //set this to adjust steering
 int _GOVERNER_F = 20; //cap the forward speed
 int _GOVERNER_R = -12;
 
@@ -66,8 +66,8 @@ Servo throttle_servo;
 float steer_input = STEER_BASE;
 float throttle_input = THROTTLE_BASE;
 
-int throttle_pos;
-int steering_angle;
+float throttle_pos;
+float steering_angle;
 
 
 //make sure we have a transmitter so that we can safety stop the car
@@ -78,76 +78,36 @@ bool manual_mode = false;
 volatile byte half_revolutions;
 unsigned int rpm;
 unsigned long timeold;
+int rpm_decay;
 
 
-//flags for emegency breaking
-bool emergency_breaking = true;
-
-//sonar
-unsigned int sonar_distance[SONAR_NUM];
-unsigned int pingTimer = 0;         // Where the ping distances are stored.
-NewPing sonar[SONAR_NUM] = {
-  NewPing(TRIGGER_PIN, ECHO_PIN_LEFT, MAX_DISTANCE),
-  NewPing(TRIGGER_PIN, ECHO_PIN_RIGHT, MAX_DISTANCE)
-};
-
-
+//emergency breaking
+bool emergency_breaking = false;
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
 void set_steer_angle(int angle) {
-  //dont set unless a delta has been acheived
-  if (abs(steering_angle - angle) / 2.0 < STEER_SENSITIVITY){
-    if (abs(angle) <= 2){
-      angle = 0;
-    }
-    else {
-      //not a big of change to change noise
-      return;
-    }
-
-    //if this value has already been set zero, no reason to set it again
-    if (steering_angle == 0) {
-      return;
-    }
-  }
-  
   steering_angle = angle;
   commander.sendBinCmd(cmd_steer,steering_angle);
+
   
   //apply bias which accounts for physical issues, not model issues
   //we dont want our intented steer angle (0 for straight) to
   //reflect any issue in physical bias of the car
   angle = angle + _STEER_BIAS;
 
-  int map_angle = map(angle, -45, 45, 0, 180);
-  steering_servo.write(map_angle);
+  int map_angle_ms = int(map(angle, -45, 45, 1000, 2000));
+  steering_servo.write(map_angle_ms);
 }
 
 //when using the transmitter, map the steering to the TX output
 void set_steer_angle_manual(float sp) {
-  int map_angle = map(int(sp), STEER_MIN, STEER_MAX, -45, 45);
+  float map_angle = map(sp, STEER_MIN, STEER_MAX, -45.0, 45.0);
   set_steer_angle(map_angle);
 }
 
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
-void set_throttle_position(int pos) {
-  //dont set unless a delta has been acheived
-  if (abs(throttle_pos - pos)/2.0 < THROTTLE_SENSITIVITY){
-    if (abs(pos) <= 5){
-      pos = 0;
-    }
-    else {
-      //not a big of change to change noise
-      return;
-    }
 
-    //if this value has already been set zero, no reason to set it again
-    if (throttle_pos == 0) {
-      return;
-    }
-  }
-  
-
+void set_throttle_position(float pos) {
   //dont allow input past the limits, note we only limit reverse if the 
   //standing throttle position is at zero. This allows for full breaking
   if (rpm < ROLLING_RPM){
@@ -160,7 +120,7 @@ void set_throttle_position(int pos) {
   commander.sendBinCmd(cmd_throttle, throttle_pos);
 
   //note!!!!! the 1000 and 2000 here are the min and max PWM that the controller accepts
-  int map_throttle = map(pos, -100, 100, 1000, 2000);
+  int map_throttle = int(map(pos, -100, 100, 1000, 2000));
   
 
   throttle_servo.writeMicroseconds(map_throttle);
@@ -168,7 +128,25 @@ void set_throttle_position(int pos) {
 
 //when using the transmitter, map the throttle to the TX output
 void set_throttle_position_manual(float sp) {
-  int map_throttle = map(int(sp), THROTTLE_MIN, THROTTLE_MAX, -100, 100);
+  
+//  //dont set unless a delta has been acheived
+//  if (abs(throttle_pos - pos)/2.0 < THROTTLE_SENSITIVITY){
+//    if (abs(pos) <= 5){
+//      pos = 0;
+//    }
+//    else {
+//      //not a big of change to change noise
+//      return;
+//    }
+//
+//    //if this value has already been set zero, no reason to set it again
+//    if (throttle_pos == 0) {
+//      return;
+//    }
+//  }
+
+  
+  float map_throttle = map(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
   set_throttle_position(map_throttle);
 }
 
@@ -318,9 +296,12 @@ void loop() {
   //look for commands
   commander.feedinSerialData();
 
-  //buffer the inputs, from the controller, they are noisy
-  steer_input = (steer_input + pulseIn(STEER_IN, HIGH, 25000)) / 2.0;
-  throttle_input = (throttle_input + pulseIn(THROTTLE_IN, HIGH, 25000)) / 2.0;
+  //buffer the inputs, from the controller, they are noisy 
+//  steer_input = (steer_input * 2 + pulseIn(STEER_IN, HIGH, 250000)) / 3.0;
+//  throttle_input = (throttle_input * 2 + pulseIn(THROTTLE_IN, HIGH, 250000)) / 3.0;
+
+  steer_input = pulseIn(STEER_IN, HIGH, 250000);
+  throttle_input = pulseIn(THROTTLE_IN, HIGH, 250000);
 
   //if ever the transmitter is used, go into manual mode
   if (!manual_mode) {
@@ -335,6 +316,18 @@ void loop() {
 
   //output rpms
   write_rpms();
+
+  //decay rpms incase vehicle has stopped
+  if (rpm_decay >=2){
+    rpm_decay = int(rpm_decay/2);
+    if (rpm_decay < 2){
+      rpm = 0;
+      commander.sendBinCmd(cmd_rpm, rpm);
+     }
+  }
+ 
+
+  
  
 }
 
@@ -383,30 +376,11 @@ void attach_commander_callbacks(void) {
 }
 
 void write_rpms(){
-  if (half_revolutions >= 6) {
+  if (half_revolutions >= 2) {
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
+     rpm_decay = rpm;
      timeold = millis();
      half_revolutions = 0;
      commander.sendBinCmd(cmd_rpm, rpm);
   }
 }
-
-// void monitor_for_emergency_stop(){
-//   if ((sonar_distance[0] + sonar_distance[1])/2 <=  min(120, (40 + rpm/10)) && 
-//     rpm >= ROLLING_RPM) {
-//     commander.sendCmd(cmd_info, "OH SHIT");
-//     commander.sendCmd(cmd_info, String("  --RPM: ") + rpm);
-//     commander.sendCmd(cmd_info, String("  --TP: ") + throttle_pos);
-//     commander.sendCmd(cmd_info, String("  --LP: ") + sonar_distance[0]);
-//     commander.sendCmd(cmd_info, String("  --RP: ") + sonar_distance[1]);
-
-//     //emergency break
-//     set_throttle_position(-100);
-//     delay(3000);
-//     set_throttle_position(0);
-//     rpm = 0;
-
-//     //require arming
-//     // enter_arming_mode();
-//   }
-// }
