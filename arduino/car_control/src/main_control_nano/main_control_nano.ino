@@ -85,7 +85,7 @@ int rpm_decay;
 bool emergency_breaking = false;
 
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
-void set_steer_angle(int angle) {
+void set_steer_angle(float angle) {
   steering_angle = angle;
   commander.sendBinCmd(cmd_steer,steering_angle);
 
