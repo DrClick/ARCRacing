@@ -17,12 +17,14 @@ from keras.layers.pooling import MaxPooling2D
 
 import pickle
 
+from time import time
+
 
 class Pilot:
     def __init__(self):
         self.autonomous_mode = False
         self.cv_bridge = CvBridge()
-        self.flag_1 = True
+        self.rpm = -1
 
         rospy.init_node('pilot')
         rospy.Subscriber('/bus_comm', String, self.bus_comm_callback)
@@ -46,28 +48,46 @@ class Pilot:
 
     def car_command_callback(self, data):
         #look for autonmouse mode, only 
-        rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
+        #rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
         m = data.data
 
         if(m.startswith("MOD")):
             self.autonomous_mode = True if m.split(":")[1] == "true" else False
             print("set auto mode for image prediction", self.autonomous_mode)
 
+
     """
     listen for the car to be triggered in manual mode and stop making predictions
     """
     def bus_comm_callback(self, data):
-        rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
+        #rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
         m = data.data
 
         if m =="INF:Manual mode triggered from TX":
             self.autonomous_mode = False
-        
+            self.rpm = -1
+
+
+
+        # try and set rpms to 100. If its above 100, set throttle to zero, if below set to 8
+        #slow down for corners
+        if m.startswith("RPM"):
+            self.rpm = int(m[4:])
+            print("RPM", self.rpm)
+            target_rpm = 300
+
+            if self.rpm < target_rpm:
+                message = "THR:8"
+                #self.command_publisher.publish(message)
+            else:
+                message = "THR:0"
+                #self.command_publisher.publish(message)
 
 
     def camera_callback(self, data):
         if not self.autonomous_mode:
             return
+
 
         raw_image = self.cv_bridge.compressed_imgmsg_to_cv2(data, "bgr8")
         image_to_predict_on = self.pipeline(raw_image)
@@ -85,8 +105,15 @@ class Pilot:
 
         #wrte this to the command bux
         message = "STR:{}".format(predicted_steering_angle)
-        print(message)
         self.command_publisher.publish(message)
+
+
+        #start the car rolling
+        #if self.rpm == -1:
+            #self.rpm = 0
+            #self.command_publisher.publish("THR:8")
+        
+        
 
 def create_model():
         model = Sequential()
@@ -137,9 +164,10 @@ def create_model():
 
         return model
 model = create_model()
-model.load_weights("//home/nvidia/code/ARCRacing/models/model_sim_1_run_main_track_forward.h5")
+model.load_weights("//home/nvidia/code/ARCRacing/models/office_set_2_5.h5")
 graph = tf.get_default_graph()
 
 
 if __name__ == '__main__':
     pilot = Pilot()
+

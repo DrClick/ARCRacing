@@ -1,3 +1,0 @@
-<launch>
-    <node pkg="vector79" type="car_communicator.py" name="car_communicator"/>
-</launch>

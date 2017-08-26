@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
+from std_msgs.msg import Int16
+from geometry_msgs.msg import Twist
 import  PyCmdMessenger
 from ArduinoBoard import ArduinoBoard
 import threading
@@ -60,7 +62,10 @@ def cmd_callback(data):
         commander.send("cmd_govern_forward", governer)
 
 def read_from_pi(_commander):
-    pub = rospy.Publisher('bus_comm', String, queue_size=10000)
+    info_pub = rospy.Publisher('bus_comm', String, queue_size=100)
+    rpm_pub = rospy.Publisher('car_rpm', Int16, queue_size=100)
+    twist_pub = rospy.Publisher('car_velocity', Twist, queue_size=100)
+    
     while True:
         # publish the commands received if a command was received
         try:
@@ -69,17 +74,37 @@ def read_from_pi(_commander):
                 continue
 
             command, values, time = raw_command
-
-            if command in commands_to_bus_code:
-                bus_code = commands_to_bus_code[command]
-                msg_values = ",".join([str(x) for x in values])
-                message = "{}:{}".format(bus_code, msg_values)
+            if command not in commands_to_bus_code:
+                continue
                 
-                if bus_code == "RPM":
-                    print("RPM FOUND", message)
-                pub.publish(message)
+          
+            bus_code = commands_to_bus_code[command]
+            msg_values = ",".join([str(x) for x in values])
+            message = "{}:{}".format(bus_code, msg_values)
+            
+            #print("DEBUG", bus_code, msg_values, message)
+            
+            if bus_code == "RPM":
+                rpm = int(msg_values)
+                rpm_pub.publish(rpm)
+            
+            elif bus_code == "STR":
+                velocity = Twist()
+                velocity.angular.z = float(msg_values)
+                twist_pub.publish(velocity)
+
+            elif bus_code == "THR":
+                velocity = Twist()
+                velocity.linear.x = float(msg_values)
+                twist_pub.publish(velocity)
+               
+            info_pub.publish(message)
+            
         except:
             pass
+
+        
+        
 
 
 def car_communicator():
