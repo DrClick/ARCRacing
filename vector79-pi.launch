@@ -1,8 +1,8 @@
 <launch>
     <node pkg="vector79" type="lcd_output.py" name="lcd_output"/>
     <node pkg="raspicam" type="raspicam_node" name="camera">
-	 <param name="framerate" value="90"/>
-	 <param name="quality" value="10.0"/>
+	 <param name="framerate" value="60"/>
+	 <param name="quality" value="30.0"/>
     </node>
     <node pkg="rosservice" type="rosservice" name="camera_start" args="call --wait /camera/start_capture"/>
 </launch>

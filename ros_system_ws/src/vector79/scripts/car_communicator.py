@@ -47,11 +47,11 @@ def cmd_callback(data):
     m =  data.data
 
     if(m.startswith("THR")):
-        throttle_pos = int(m.split(":")[1])
+        throttle_pos = float(m.split(":")[1])
         commander.send("cmd_throttle", throttle_pos)
 
     if(m.startswith("STR")):
-        steer_angle = int(m.split(":")[1])
+        steer_angle = float(m.split(":")[1])
         commander.send("cmd_steer", steer_angle)
 
     if(m.startswith("MOD")):
@@ -123,7 +123,7 @@ def car_communicator():
 
     
     listener_thread = threading.Thread(target = read_from_pi, args=[commander])
-     print "Starting car communicator"
+    print ("Starting car communicator")
     listener_thread.start()
 
 
