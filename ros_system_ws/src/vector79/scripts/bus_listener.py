@@ -10,15 +10,10 @@ ser = serial.Serial('/dev/ttyACM0', 115200, timeout=.1)
 def bus_comm():
     pub = rospy.Publisher('bus_comm', String, queue_size=10)
     rospy.init_node('bus_comm')
-    # rate = rospy.Rate(10) # 10hz
-    
+
     while not rospy.is_shutdown():
         car_info = ser.readline()
         msg = "[{}] {}".format(rospy.get_time(), car_info)
-        # do i really need to do this
-        # rospy.loginfo(msg)
-
-
         pub.publish(msg)
 
 if __name__ == '__main__':

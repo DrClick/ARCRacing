@@ -42,9 +42,10 @@ class Pilot:
 
     #the image pipeline to apply before processing
     def pipeline(self, img):
-        output = img[200:361,:,:]
+        output = img[100:180,:,:]
         output = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
-        return  cv2.resize(output, (0,0), fx=0.5, fy=0.5)
+        return output
+        # return  cv2.resize(output, (0,0), fx=0.5, fy=0.5)
 
 
     def car_command_callback(self, data):
@@ -69,7 +70,8 @@ class Pilot:
             self.rpm = -1
 
 
-
+        if not self.autonomous_mode:
+            return
         # try and set rpms to 100. If its above 100, set throttle to zero, if below set to 8
         #slow down for corners
         if m.startswith("RPM"):
@@ -79,10 +81,10 @@ class Pilot:
 
             if self.rpm < target_rpm:
                 message = "THR:8"
-                #self.command_publisher.publish(message)
+                self.command_publisher.publish(message)
             else:
-                message = "THR:0"
-                #self.command_publisher.publish(message)
+                message = "THR:4"
+                self.command_publisher.publish(message)
 
 
     def camera_callback(self, data):
@@ -92,7 +94,7 @@ class Pilot:
 
         raw_image = self.cv_bridge.compressed_imgmsg_to_cv2(data, "bgr8")
         image_to_predict_on = self.pipeline(raw_image)
-        imsave("predict.jpg", image_to_predict_on)
+        #imsave("predict.jpg", image_to_predict_on)
 
 
         #create a batch of size 1
@@ -112,9 +114,9 @@ class Pilot:
 
 
         #start the car rolling
-        #if self.rpm == -1:
-            #self.rpm = 0
-            #self.command_publisher.publish("THR:8")
+        if self.rpm == -1:
+            self.rpm = 0
+            self.command_publisher.publish("THR:8")
         
         
 
@@ -168,7 +170,7 @@ def create_model():
         return model
 
 model = create_model()
-model.load_weights("/home/nvidia/code/ARCRacing/models/office_set_3_15.h5")
+model.load_weights("/home/nvidia/code/ARCRacing/models/office_set_0_12.h5")
 graph = tf.get_default_graph()
 
 

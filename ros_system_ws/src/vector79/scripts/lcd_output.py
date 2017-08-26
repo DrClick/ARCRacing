@@ -25,8 +25,6 @@ _serial = serial.Serial('/dev/ttyUSB1', 115200, timeout=.1)
 time.sleep(5)
 
 def callback(data):
-    rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
-    
     message_type, message = data.data.split(":")
     write_lcd(message_type, message)
 
@@ -41,14 +39,17 @@ def write_lcd(message_type, message):
         "WRN":      ["1", 20],
         "INF":      ["2", 20],
         "M_2":      ["2", 20],
-        "RPM":      ["R", 5],
+        # "RPM":      ["R", 4],
     }
 
     if message_type in formatting:
         prepend_char, message_length = formatting[message_type]
+        message.trim()
         output = "{} - {}\n".format(prepend_char, message.rjust(message_length))
-        time.sleep(.01)
-        _serial.write(output)
+        if time.time() % 10 == 0 and message_type in ['THR','STR']:
+            _serial.write(output)
+        else:
+            _serial.write(output)
         
 
 
@@ -60,7 +61,7 @@ def lcd_output():
     # anonymous=True flag means that rospy will choose a unique
     # name for our 'listener' node so that multiple listeners can
     # run simultaneously.
-    rospy.init_node('lcd_output', anonymous=True)
+    rospy.init_node('lcd_output')
 
     rospy.Subscriber('bus_comm', String, callback)
 
