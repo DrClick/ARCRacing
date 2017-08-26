@@ -47,8 +47,9 @@ def write_lcd(message_type, message):
     if message_type in formatting:
         prepend_char, message_length = formatting[message_type]
         output = "{} - {}\n".format(prepend_char, message.rjust(message_length))
-        _serial.write(output)
         time.sleep(.01)
+        _serial.write(output)
+        
 
 
 
