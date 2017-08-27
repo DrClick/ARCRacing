@@ -301,7 +301,7 @@ void loop() {
 
   //decay rpms incase vehicle has stopped
   rpm_decay++;
-  if (rpm_decay >100){
+  if (rpm_decay >20){
     rpm = 0;
     rpm_decay = 0;
     commander.sendBinCmd(cmd_rpm, rpm);
