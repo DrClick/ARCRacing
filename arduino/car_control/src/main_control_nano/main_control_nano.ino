@@ -113,12 +113,7 @@ void set_steer_angle_manual(float sp) {
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
 
 void set_throttle_position(float pos) {
-  //dont allow input past the limits, note we only limit reverse if the 
-  //standing throttle position is at zero. This allows for full breaking
-  if (rpm < ROLLING_RPM){
-    pos = max(_GOVERNER_R, pos);
-  }
-  
+  //dont allow input past the limits
   pos = min(_GOVERNER_F, pos);
 
   throttle_pos = pos;
