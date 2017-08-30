@@ -18,13 +18,13 @@ class BagExtractor():
     current_values = {
         "STR": 0,
         "RPM": 0,
-        # "THR": 0,
-        # "UFR": 0,
-        # "UFL": 0,
-        # "ACC": [0,0,0],
-        # "GYR": [0,0,0],
-        # "MAG": [0,0,0],
-        # "PRH": [0,0,0]
+        "THR": 0,
+        "UFR": 0,
+        "UFL": 0,
+        "ACC": [0,0,0],
+        "GYR": [0,0,0],
+        "MAG": [0,0,0],
+        "PRH": [0,0,0]
     }
 
     def __init__(self):
@@ -49,17 +49,26 @@ class BagExtractor():
                 topic_parts = topic.split('/')
                 
                 #read in the sensor data
-                if len(topic_parts) < 2:
-                    print(topic, msg)
-                    continue
+                
 
-                if topic_parts[1] == 'bus_comm':
-                    
+                if topic_parts[0] == 'bus_comm':
                     bus_code, bus_value = msg.data.split(":")
                     if bus_code in self.current_values:
-                        print(bus_code, bus_value)
-                        self.current_values[bus_code] = bus_value.strip()
-                        
+                        print("bus_str", bus_value)
+
+                if topic_parts[0] == 'car_rpm':
+                    print("rpm", msg)
+                    self.current_values["RPM"] = msg
+
+                if topic_parts[0] == 'car_velocity':
+                    steer = msg.angular.z
+                    throttle = msg.linear.x
+                    print(steer)
+                    self.current_values["STR"] = steer
+                    self.current_values["THR"] = throttle
+                 
+                if len(topic_parts) < 2:
+                    continue       
 
                 if topic_parts[1] == 'camera' and topic_parts[2] == "image":
                     values = [str(x) for x in self.current_values.values()]

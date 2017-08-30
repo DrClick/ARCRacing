@@ -35,6 +35,8 @@ commands_to_bus_code = {
     "cmd_info":         "INF",
     "cmd_voltage":      "VLT"
 }
+
+
 # Initialize the messenger
 commander = PyCmdMessenger.CmdMessenger(arduino, commands)
 
@@ -66,7 +68,9 @@ def read_from_pi(_commander):
     info_pub = rospy.Publisher('bus_comm', String, queue_size=100)
     rpm_pub = rospy.Publisher('car_rpm', Int16, queue_size=100)
     twist_pub = rospy.Publisher('car_velocity', Twist, queue_size=100)
-    
+
+    current_car_velocity = Twist()
+
     while True:
         # publish the commands received if a command was received
         
@@ -90,16 +94,14 @@ def read_from_pi(_commander):
             rpm_pub.publish(rpm)
         
         elif bus_code == "STR":
-            velocity = Twist()
-            velocity.angular.z = float(msg_values)
-            msg_values = int(velocity.angular.z)
-            twist_pub.publish(velocity)
+            current_car_velocity.angular.z = float(msg_values)
+            msg_values = int(current_car_velocity.angular.z)
+            twist_pub.publish(current_car_velocity)
 
         elif bus_code == "THR":
-            velocity = Twist()
-            velocity.linear.x = float(msg_values)
-            msg_values = int(velocity.linear.x)
-            twist_pub.publish(velocity)
+            current_car_velocity.linear.x = float(msg_values)
+            msg_values = int(current_car_velocity.linear.x)
+            twist_pub.publish(current_car_velocity)
         
         message = "{}:{}".format(bus_code, msg_values)
         info_pub.publish(message)
