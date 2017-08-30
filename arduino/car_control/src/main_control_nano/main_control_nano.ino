@@ -113,12 +113,7 @@ void set_steer_angle_manual(float sp) {
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
 
 void set_throttle_position(float pos) {
-  //dont allow input past the limits, note we only limit reverse if the 
-  //standing throttle position is at zero. This allows for full breaking
-  if (rpm < ROLLING_RPM){
-    pos = max(_GOVERNER_R, pos);
-  }
-  
+  //dont allow input past the limits
   pos = min(_GOVERNER_F, pos);
 
   throttle_pos = pos;
@@ -158,14 +153,13 @@ void sweep() {
   //sweep steering
   for (int i = -45; i < 45; i++) {
     set_steer_angle(i);
-    delay(10);
+    delay(5);
   }
   for (int i = 45; i >= -45; i--) {
     set_steer_angle(i);
-    delay(10);
+    delay(5);
   }
   set_steer_angle(0);
-  delay(100);
 }
 
 void toggle_LED(int led, bool visable) {
@@ -203,15 +197,6 @@ void enter_arming_mode(){
   while (!TX_found) {
     //read in the from the controller
     steer_input = pulseIn(STEER_IN, HIGH, 25000);
-    throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
-    //Serial.println(steer_input);
-    //Serial.println(throttle_input);
-
-    //toggle red led while waiting to arm
-    toggle_LED(LED_RED, true);
-    delay(10);
-    toggle_LED(LED_RED, false);
-    delay(10);
 
     if (steer_input > (STEER_MAX - 100) && !TX_high) {
       commander.sendCmd(cmd_info, "LEFT RX");
@@ -224,13 +209,6 @@ void enter_arming_mode(){
 
     if (TX_low && TX_high) {
       TX_found = true;
-      toggle_LED(LED_RED, false);
-      for (int i = 0; i < 30; i++) {
-        toggle_LED(LED_GREEN, true);
-        delay(80);
-        toggle_LED(LED_GREEN, false);
-        delay(80);
-      }
       enter_auto_mode();
     }
     
@@ -262,17 +240,13 @@ void setup() {
 
   delay(1);
   sweep();
-  commander.sendCmd(cmd_info, "setup complete in 1s");
-  delay(1000);
-
+  commander.sendCmd(cmd_info, "setup complete");
   //init rpm
   half_revolutions = 0;
   rpm = 0;
   timeold = 0;
 
-
   attach_commander_callbacks(); 
-
   enter_arming_mode();
 }
 
@@ -306,7 +280,7 @@ void loop() {
 
   //decay rpms incase vehicle has stopped
   rpm_decay++;
-  if (rpm_decay >100){
+  if (rpm_decay >10){
     rpm = 0;
     rpm_decay = 0;
     commander.sendBinCmd(cmd_rpm, rpm);
@@ -362,7 +336,7 @@ void attach_commander_callbacks(void) {
 }
 
 void write_rpms(){
-  if (half_revolutions >= 2) {
+  if (half_revolutions >= 4) {
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
      rpm_decay = 0;
      timeold = millis();
