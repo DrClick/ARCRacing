@@ -48,7 +48,7 @@ class Pilot:
             [0, self.num_prediction_frames_to_use_steer - 1])
         # self.__map_predict_angle_to_target_rpm = interp1d([0, 45], [self.max_rpm, self.min_rpm])
         self.__map_decel_rpm_to_throttle = interp1d([0, self.max_rpm - self.min_rpm], [-20, -100.0])
-        self.__map_accel_rpm_to_throttle = interp1d([0, self.max_rpm], [8.0, 30.0])
+        self.__map_accel_rpm_to_throttle = interp1d([0, self.max_rpm], [8.0, 15.0])
 
         #angle_to_rpm_curve
         self.set_angle_to_rpm_curve()

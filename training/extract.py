@@ -45,33 +45,30 @@ class BagExtractor():
         with rosbag.Bag(self.bag_file, 'r') as bag:
             print("Opened bag file just fine!")
             for topic, msg, t in bag.read_messages():
-                
+                sys.stdout.write(".")
                 topic_parts = topic.split('/')
                 
-                #read in the sensor data
-                
-
-                if topic_parts[0] == 'bus_comm':
-                    bus_code, bus_value = msg.data.split(":")
-                    if bus_code in self.current_values:
-                        print("bus_str", bus_value)
-
-                if topic_parts[0] == 'car_rpm':
-                    print("rpm", msg)
-                    self.current_values["RPM"] = msg
-
+#                if topic_parts[0] == 'bus_comm':
+#                    bus_code, bus_value = msg.data.split(":")
+#                    if bus_code in self.current_values:
+#                        if bus_code != "RPM":
+#                           self.current_values[bus_code] = bus_value
+#
                 if topic_parts[0] == 'car_velocity':
                     steer = msg.angular.z
                     throttle = msg.linear.x
-                    print(steer)
                     self.current_values["STR"] = steer
                     self.current_values["THR"] = throttle
                  
+
                 if len(topic_parts) < 2:
                     continue       
 
+                if topic_parts[1] == 'car_rpm':
+                    self.current_values["RPM"] = msg.data
+
                 if topic_parts[1] == 'camera' and topic_parts[2] == "image":
-                    values = [str(x) for x in self.current_values.values()]
+                    values = [str(x).strip() for x in self.current_values.values()]
                     entry = "|".join([str(self.image_counter)] + values + [str(t.to_nsec())])
                     self.output.append(entry)
                     
@@ -87,7 +84,6 @@ class BagExtractor():
         #write the output
         with open(self.output_dir + "/_data.csv", 'w') as f:
             for i in self.output:
-                #print(i)
                 f.write("{}\n".format(i))
 # Main function.    
 if __name__ == '__main__':
