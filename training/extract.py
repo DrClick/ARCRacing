@@ -18,13 +18,13 @@ class BagExtractor():
     current_values = {
         "STR": 0,
         "RPM": 0,
-        # "THR": 0,
-        # "UFR": 0,
-        # "UFL": 0,
-        # "ACC": [0,0,0],
-        # "GYR": [0,0,0],
-        # "MAG": [0,0,0],
-        # "PRH": [0,0,0]
+        "THR": 0,
+        "UFR": 0,
+        "UFL": 0,
+        "ACC": [0,0,0],
+        "GYR": [0,0,0],
+        "MAG": [0,0,0],
+        "PRH": [0,0,0]
     }
 
     def __init__(self):
@@ -45,20 +45,30 @@ class BagExtractor():
         with rosbag.Bag(self.bag_file, 'r') as bag:
             print("Opened bag file just fine!")
             for topic, msg, t in bag.read_messages():
-                
+                sys.stdout.write(".")
                 topic_parts = topic.split('/')
                 
-                #read in the sensor data
-                if topic_parts[1] == 'bus_comm':
-                    
-                    bus_code, bus_value = msg.data.split(":")
-                    if bus_code in self.current_values:
-                        print(bus_code, bus_value)
-                        self.current_values[bus_code] = bus_value.strip()
-                        
+#                if topic_parts[0] == 'bus_comm':
+#                    bus_code, bus_value = msg.data.split(":")
+#                    if bus_code in self.current_values:
+#                        if bus_code != "RPM":
+#                           self.current_values[bus_code] = bus_value
+#
+                if topic_parts[0] == 'car_velocity':
+                    steer = msg.angular.z
+                    throttle = msg.linear.x
+                    self.current_values["STR"] = steer
+                    self.current_values["THR"] = throttle
+                 
+
+                if len(topic_parts) < 2:
+                    continue       
+
+                if topic_parts[1] == 'car_rpm':
+                    self.current_values["RPM"] = msg.data
 
                 if topic_parts[1] == 'camera' and topic_parts[2] == "image":
-                    values = [str(x) for x in self.current_values.values()]
+                    values = [str(x).strip() for x in self.current_values.values()]
                     entry = "|".join([str(self.image_counter)] + values + [str(t.to_nsec())])
                     self.output.append(entry)
                     
@@ -74,7 +84,6 @@ class BagExtractor():
         #write the output
         with open(self.output_dir + "/_data.csv", 'w') as f:
             for i in self.output:
-                #print(i)
                 f.write("{}\n".format(i))
 # Main function.    
 if __name__ == '__main__':

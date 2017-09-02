@@ -84,8 +84,13 @@ int rpm_decay;
 //emergency breaking
 bool emergency_breaking = false;
 
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+ return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 //sets the steering angle between -45, 45 for full left /right respectively. set to zero for straight ahead
-void set_steer_angle(int angle) {
+void set_steer_angle(float angle) {
   steering_angle = angle;
   commander.sendBinCmd(cmd_steer,steering_angle);
 
@@ -101,19 +106,14 @@ void set_steer_angle(int angle) {
 
 //when using the transmitter, map the steering to the TX output
 void set_steer_angle_manual(float sp) {
-  float map_angle = map(sp, STEER_MIN, STEER_MAX, -45.0, 45.0);
+  float map_angle = mapfloat(sp, STEER_MIN, STEER_MAX, -45.0, 45.0);
   set_steer_angle(map_angle);
 }
 
 //controls the acceleration/deccelration of the robot. -100 is full break to 100 full gas
 
 void set_throttle_position(float pos) {
-  //dont allow input past the limits, note we only limit reverse if the 
-  //standing throttle position is at zero. This allows for full breaking
-  if (rpm < ROLLING_RPM){
-    pos = max(_GOVERNER_R, pos);
-  }
-  
+  //dont allow input past the limits
   pos = min(_GOVERNER_F, pos);
 
   throttle_pos = pos;
@@ -128,25 +128,7 @@ void set_throttle_position(float pos) {
 
 //when using the transmitter, map the throttle to the TX output
 void set_throttle_position_manual(float sp) {
-  
-//  //dont set unless a delta has been acheived
-//  if (abs(throttle_pos - pos)/2.0 < THROTTLE_SENSITIVITY){
-//    if (abs(pos) <= 5){
-//      pos = 0;
-//    }
-//    else {
-//      //not a big of change to change noise
-//      return;
-//    }
-//
-//    //if this value has already been set zero, no reason to set it again
-//    if (throttle_pos == 0) {
-//      return;
-//    }
-//  }
-
-  
-  float map_throttle = map(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
+  float map_throttle = mapfloat(sp, THROTTLE_MIN, THROTTLE_MAX, -100, 100);
   set_throttle_position(map_throttle);
 }
 
@@ -171,14 +153,13 @@ void sweep() {
   //sweep steering
   for (int i = -45; i < 45; i++) {
     set_steer_angle(i);
-    delay(10);
+    delay(5);
   }
   for (int i = 45; i >= -45; i--) {
     set_steer_angle(i);
-    delay(10);
+    delay(5);
   }
   set_steer_angle(0);
-  delay(100);
 }
 
 void toggle_LED(int led, bool visable) {
@@ -216,15 +197,6 @@ void enter_arming_mode(){
   while (!TX_found) {
     //read in the from the controller
     steer_input = pulseIn(STEER_IN, HIGH, 25000);
-    throttle_input = pulseIn(THROTTLE_IN, HIGH, 25000);
-    //Serial.println(steer_input);
-    //Serial.println(throttle_input);
-
-    //toggle red led while waiting to arm
-    toggle_LED(LED_RED, true);
-    delay(10);
-    toggle_LED(LED_RED, false);
-    delay(10);
 
     if (steer_input > (STEER_MAX - 100) && !TX_high) {
       commander.sendCmd(cmd_info, "LEFT RX");
@@ -237,13 +209,6 @@ void enter_arming_mode(){
 
     if (TX_low && TX_high) {
       TX_found = true;
-      toggle_LED(LED_RED, false);
-      for (int i = 0; i < 30; i++) {
-        toggle_LED(LED_GREEN, true);
-        delay(80);
-        toggle_LED(LED_GREEN, false);
-        delay(80);
-      }
       enter_auto_mode();
     }
     
@@ -275,17 +240,13 @@ void setup() {
 
   delay(1);
   sweep();
-  commander.sendCmd(cmd_info, "setup complete in 1s");
-  delay(1000);
-
+  commander.sendCmd(cmd_info, "setup complete");
   //init rpm
   half_revolutions = 0;
   rpm = 0;
   timeold = 0;
 
-
   attach_commander_callbacks(); 
-
   enter_arming_mode();
 }
 
@@ -318,13 +279,12 @@ void loop() {
   write_rpms();
 
   //decay rpms incase vehicle has stopped
-  if (rpm_decay >=2){
-    rpm_decay = int(rpm_decay/2);
-    if (rpm_decay < 2){
-      rpm = 0;
-      commander.sendBinCmd(cmd_rpm, rpm);
-     }
-  }
+  rpm_decay++;
+  if (rpm_decay >10){
+    rpm = 0;
+    rpm_decay = 0;
+    commander.sendBinCmd(cmd_rpm, rpm);
+   }
  
 
   
@@ -334,11 +294,11 @@ void loop() {
 
 //commander callbacks
 void on_cmd_steer(void){
-    if(!manual_mode) set_steer_angle(commander.readBinArg<int>());
+    if(!manual_mode) set_steer_angle(commander.readBinArg<float>());
 }
 
 void on_cmd_throttle(void){
-    if(!manual_mode) set_throttle_position(commander.readBinArg<int>());
+    if(!manual_mode) set_throttle_position(commander.readBinArg<float>());
 }
 
 void on_cmd_toggle_ebrake(void){
@@ -376,9 +336,9 @@ void attach_commander_callbacks(void) {
 }
 
 void write_rpms(){
-  if (half_revolutions >= 2) {
+  if (half_revolutions >= 4) {
      rpm = 30 * 1000/(millis() - timeold) * half_revolutions;
-     rpm_decay = rpm;
+     rpm_decay = 0;
      timeold = millis();
      half_revolutions = 0;
      commander.sendBinCmd(cmd_rpm, rpm);

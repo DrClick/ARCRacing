@@ -21,20 +21,16 @@ def get_temp():
 
 
 #TODO: figure out how to figure out this port programatically
-_serial = serial.Serial('/dev/ttyUSB0', 115200, timeout=.1)
+_serial = serial.Serial('/dev/ttyUSB1', 115200, timeout=.1)
 time.sleep(5)
 
 def callback(data):
-    rospy.loginfo(rospy.get_caller_id() + '%s', data.data)
-    
     message_type, message = data.data.split(":")
     write_lcd(message_type, message)
 
 def write_lcd(message_type, message):
     formatting = {
-        "V79-T":    ["T", 4],#TODO: Remove these, legacy from 1st run
         "THR":      ["T", 4],
-        "V79-S":    ["S", 4],#TODO: Remove these, legacy from 1st run
         "STR":      ["S", 4],
         "IP":       ["I", 20],
         "TMP":      ["P", 2],
@@ -43,28 +39,24 @@ def write_lcd(message_type, message):
         "WRN":      ["1", 20],
         "INF":      ["2", 20],
         "M_2":      ["2", 20],
-        "RPM":      ["R", 5],
+        "RPM":      ["R", 4],
     }
 
     if message_type in formatting:
         prepend_char, message_length = formatting[message_type]
+        message.strip()
         output = "{} - {}\n".format(prepend_char, message.rjust(message_length))
-        _serial.write(output)
-        time.sleep(.01)
+        if time.time() % 10 == 0 and message_type in ['THR','STR']:
+            _serial.write(output)
+        else:
+            _serial.write(output)
+        
 
 
 
 def lcd_output():
-
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
-    rospy.init_node('lcd_output', anonymous=True)
-
+    rospy.init_node('lcd_output')
     rospy.Subscriber('bus_comm', String, callback)
-
 
     write_lcd("M_2", "vector-79 pi ROS online")
     write_lcd("IP", "p" + get_ip_address())
@@ -78,4 +70,5 @@ def lcd_output():
 
 if __name__ == '__main__':
     lcd_output()
+
 
