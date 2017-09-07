@@ -31,24 +31,24 @@ class Pilot:
         self.rpm = 0
         self.target_rpm = 500
         self.max_rpm = 1500
-        self.min_rpm = 100
+        self.min_rpm = 200
         self.num_prediction_frames = 30
 
         # might turn out to be too much prediction
         self.num_prediction_frames_to_use_rpm = 30
-        self.num_prediction_frames_to_use_steer = 10
+        self.num_prediction_frames_to_use_steer = 5
 
         # tf
         self.model = self.create_model()
-        self.model.load_weights("/home/nvidia/code/ARCRacing/models/office_set_predict_ahead_90_19.h5")
+        self.model.load_weights("/home/nvidia/code/ARCRacing/models/office_set_predict_ahead_90_with_rpm_29.h5")
         self.graph = tf.get_default_graph()
 
         # maps
         self.__map_rpm_to_prediction_index = interp1d([self.min_rpm, self.max_rpm],
             [0, self.num_prediction_frames_to_use_steer - 1])
         # self.__map_predict_angle_to_target_rpm = interp1d([0, 45], [self.max_rpm, self.min_rpm])
-        self.__map_decel_rpm_to_throttle = interp1d([0, self.max_rpm - self.min_rpm], [-20, -100.0])
-        self.__map_accel_rpm_to_throttle = interp1d([0, self.max_rpm], [8.0, 20.0])
+        self.__map_decel_rpm_to_throttle = interp1d([0, self.max_rpm - self.min_rpm], [0, -100.0])
+        self.__map_accel_rpm_to_throttle = interp1d([0, self.max_rpm], [8.0, 30.0])
 
         #angle_to_rpm_curve
         self.set_angle_to_rpm_curve()
@@ -64,14 +64,29 @@ class Pilot:
         self.info_publisher = rospy.Publisher('bus_comm', String, queue_size=10)
 
         self.info_publisher.publish("INF:Enable Auto mode to start pilot")
+    
+
+        #camera calibration
+        with open('/home/nvidia/code/ARCRacing/fisheye_f1p8_camera_calibration.pkl', 'rb') as f:
+
+            calibration = pickle.load(f)
+        
+        self.mtx = calibration["mtx"]
+        self.dist = calibration["dist"]
+
+        
+
+
+
+
         rospy.spin()
 
     def set_angle_to_rpm_curve(self):
         throttle_curve = [
             (0, self.max_rpm), # at 0
             (1, self.max_rpm * .99),
-            (10, self.max_rpm * .9),
-            (15, self.max_rpm * .6),
+            (10, self.max_rpm * .6),
+            (15, self.max_rpm * .4),
             (35, self.min_rpm * 1.1),
             (40, self.min_rpm),
             (45, self.min_rpm)
@@ -99,8 +114,9 @@ class Pilot:
 
 
     # the image pipeline to apply before processing
-    def pipeline(self, img):
-        output = img[100:180, :, :]
+    def pipeline(self, image):
+        undistort = cv2.undistort(image, self.mtx, self.dist, None, self.mtx)
+        output = undistort[100:180, :, :]
         return output
 
     def car_command_callback(self, data):
@@ -138,7 +154,9 @@ class Pilot:
         image_to_predict_on = self.pipeline(img)
 
         # create a batch of size 1
-        predict_batch = image_to_predict_on[None, :, :, :]
+        predict_image = image_to_predict_on[None, :, :, :]
+        predict_rpm = np.array([self.rpm/5000])
+        predict_batch = {'image_input': predict_image, 'sensor_input': predict_rpm}
 
         # prediction should be a value between -1 and 1 so this needs to be denormalized
         
@@ -155,7 +173,9 @@ class Pilot:
         # future we need to look
         rpm_to_map = min(max(self.min_rpm, self.rpm), self.max_rpm)
         print("rpm to map", rpm_to_map)
-        prediction_index = int(self.map_rpm_to_prediction_index(rpm_to_map))
+        # prediction_index = int(self.map_rpm_to_prediction_index(rpm_to_map))
+        prediction_index = 3
+
         predicted_steering_angle = predctions[prediction_index]
 
         # wrte this to the command bus
@@ -186,21 +206,24 @@ class Pilot:
 
     def create_model(self):
         model = Sequential()
-
+        
+        #inputs
         image_input = Input(shape=(80, 320, 3), name='image_input', dtype='float32')
+        sensor_input = Input(shape=(1,), name='sensor_input', dtype='float32')
+        
         # preprocess
-        X = Lambda(lambda x: x / 255.0 - 0.5, input_shape=(80, 320, 3), name="lambda_1")(image_input)
-
+        X = Lambda(lambda x: x/255.0 - 0.5, input_shape=(80, 320, 3), name="lambda_1")(image_input)
+        
         # conv1 layer
         X = Convolution2D(32, (5, 5), name="conv_1")(X)
         X = MaxPooling2D((2, 2), name="pool_1")(X)
-        X = Activation('relu', name="relu_1")(X)
-
+        X = Activation('relu',name="relu_1")(X)
+        
         # conv2 layer
         X = Convolution2D(64, (5, 5), name="conv_2")(X)
         X = MaxPooling2D((3, 3), name="pool_2")(X)
         X = Activation('relu', name="relu_2")(X)
-
+        
         # conv3 layer
         X = Convolution2D(128, (3, 3), name="conv_3")(X)
         X = MaxPooling2D((2, 2), name="pool_3")(X)
@@ -211,36 +234,42 @@ class Pilot:
         X = MaxPooling2D((2, 2), name="pool_4")(X)
         X = Activation('relu', name="relu_4")(X)
 
-        # add fully connected layers
+        #add fully connected layers
         X = Flatten(name="flat_1")(X)
-
+        
+        #add in the speed, here we may add in other variables such 
+        # as the last several throttle / speed/ steering angles, and other sensors
+        X = concatenate([X, sensor_input], name="concate_1")
+        
         # fc1
         X = Dense(1024, name="dnse_1")(X)
         X = Dropout(0.5, name="dropout_1")(X)
         X = Activation('relu', name="dense_relu_1")(X)
-
+        
         # fc2
         X = Dense(128, name="dnse_2")(X)
         X = Dropout(0.5, name="dropout_2")(X)
         X = Activation('relu', name="dense_relu_2")(X)
-
+        
         # fc2
         X = Dense(64, name="dnse_3")(X)
         X = Dropout(0.5, name="dropout_3")(X)
         X = Activation('relu', name="dense_relu_3")(X)
-
-        # outputs are the next 10 frames
+        
+        num_predict_ahead_frames = 30
         steer_outputs = []
-        for i in range(self.num_prediction_frames):
+        for i in range(num_predict_ahead_frames):
             steer_output = Dense(1, name='steer_output_{}'.format(i))(X)
             steer_outputs.append(steer_output)
+        
+        
 
-        # model = Model(inputs=[image_input, sensor_input], outputs=[steer_output, throttle_output])
-        model = Model(inputs=[image_input], outputs=steer_outputs)
+        #model = Model(inputs=[image_input, sensor_input], outputs=[steer_output, throttle_output])
+        model = Model(inputs=[image_input, sensor_input], outputs=steer_outputs)
 
-        loss_def = {"steer_output_{}".format(i): "mse" for i in range(self.num_prediction_frames)}
-        loss_weight_def = {"steer_output_{}".format(i): 1.0 for i in range(self.num_prediction_frames)}
-
+        loss_def = {"steer_output_{}".format(i) : "mse" for i in range(num_predict_ahead_frames)}
+        loss_weight_def = {"steer_output_{}".format(i) : 1.0 for i in range(num_predict_ahead_frames)}
+        
         # note, setting the loss weight to favor steering
         model.compile(optimizer='adam', loss=loss_def, loss_weights=loss_weight_def)
 
