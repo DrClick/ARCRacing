@@ -39,6 +39,7 @@ def callback(data):
             light_state["auto"] = True
             write_light("GREEN_OFF")
             write_light("BLUE_ON")
+            write_light("RED_OFF")
 
 
         if message == "Manual mode triggered from TX":
@@ -51,6 +52,8 @@ def callback(data):
     if message_type == "WRN":
         light_state["warn"] = True
         write_light("RED_ON")
+        write_light("BLUE_OFF")
+        write_light("GREEN_OFF")
 
 
     # write brakes
