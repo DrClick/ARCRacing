@@ -20,6 +20,10 @@ def voltage_monitor():
         info_pub.publish(msg)
         voltage_pub.publish(voltage)
 
+        if voltage < 11.2:
+            msg = "WRN:LOW-VOLTAGE: {}".format(voltage)
+            info_pub.publish(msg)
+
 if __name__ == '__main__':
     voltage_monitor()
 
