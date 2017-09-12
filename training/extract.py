@@ -12,6 +12,7 @@ import sys
 
 class BagExtractor():
     camera_topic = "camera/image/compressed"
+    shadow_topic = "shadow_command"
     data_topic = "bus_comm"
     output = []
     image_counter = 0
@@ -27,6 +28,9 @@ class BagExtractor():
         "PRH": [0,0,0]
     }
 
+    #a places to store found predictions for model shadowing
+    predictions = [] 
+
     def __init__(self):
         self.output_dir = os.path.join(sys.path[0], sys.argv[1])
         self.bag_file = os.path.join(sys.path[0], sys.argv[2])
@@ -39,6 +43,12 @@ class BagExtractor():
         columns.append("time")
 
         self.output.append("|".join(columns))
+
+    def log_prediction(self, msg):
+        print(msg)
+        message, image_seq_id = msg.data.split("|")
+        prediction = round(float(message.split(":")[1]),3)
+        self.predictions.append((image_seq_id, prediction))
 
     def extract_and_sync(self):
         # Open bag file.
@@ -59,7 +69,9 @@ class BagExtractor():
                     throttle = msg.linear.x
                     self.current_values["STR"] = steer
                     self.current_values["THR"] = throttle
-                 
+
+                if topic_parts[0] == 'shadow_command':
+                    self.log_prediction(msg)
 
                 if len(topic_parts) < 2:
                     continue       
@@ -67,24 +79,34 @@ class BagExtractor():
                 if topic_parts[1] == 'car_rpm':
                     self.current_values["RPM"] = msg.data
 
+
+
                 if topic_parts[1] == 'camera' and topic_parts[2] == "image":
+                    #extract the image id
+                    image_seq_id = msg.header.seq
+
+                    #grap all the current values, sync method is last input
                     values = [str(x).strip() for x in self.current_values.values()]
-                    entry = "|".join([str(self.image_counter)] + values + [str(t.to_nsec())])
+                    entry = "|".join([str(image_seq_id)] + values + [str(t.to_nsec())])
                     self.output.append(entry)
                     
+                    #save the image
                     cv_image = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
-                    
-                    image_name = "{}/{}.jpg".format(self.output_dir, self.image_counter)
+                    image_name = "{}/{}.jpg".format(self.output_dir, image_seq_id)
                     cv2.imwrite(image_name, cv_image)
-                    self.image_counter += 1
 
 
 
 
-        #write the output
+        #write the outputs
         with open(self.output_dir + "/_data.csv", 'w') as f:
             for i in self.output:
                 f.write("{}\n".format(i))
+
+        with open(self.output_dir + "/_predictions.csv", 'w') as f:
+            for i in self.predictions:
+                f.write("{},{}\n".format(i[0], i[1]))
+
 # Main function.    
 if __name__ == '__main__':
     # Initialize the node and name it.
