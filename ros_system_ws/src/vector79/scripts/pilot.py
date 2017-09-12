@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
 
+
 import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import CompressedImage
@@ -10,7 +11,7 @@ from cv_bridge import CvBridge, CvBridgeError
 import numpy as np
 
 import tensorflow as tf
-from keras.models import Sequential
+from keras.models import Sequential, model_from_json
 from keras.layers.core import Dense, Activation, Flatten, Dropout, Lambda
 from keras.layers import concatenate, Input
 from keras.models import Model
@@ -19,6 +20,7 @@ from keras.layers.pooling import MaxPooling2D
 from scipy.misc import imsave
 from scipy.interpolate import interp1d
 import pickle
+import json
 
 from time import time
 
@@ -29,23 +31,23 @@ class Pilot:
         self.cv_bridge = CvBridge()
         self.max_steering_angle = 45
         self.rpm = 0
-        self.target_rpm = 500
-        self.max_rpm = 1500
-        self.min_rpm = 200
+        self.target_rpm = 1000 #JUMP OFF THE line
+        self.max_rpm = 2000
+        self.min_rpm = 300
         self.num_prediction_frames = 30
 
         # might turn out to be too much prediction
         self.num_prediction_frames_to_use_rpm = 30
-        self.num_prediction_frames_to_use_steer = 5
+        self.num_prediction_frames_to_use_steer = 10
 
         # tf
         self.model = self.create_model()
-        self.model.load_weights("/home/nvidia/code/ARCRacing/models/office_set_predict_ahead_90_with_rpm_29.h5")
+        self.model.load_weights("/home/nvidia/code/ARCRacing/models/shadow_2.h5")
         self.graph = tf.get_default_graph()
 
         # maps
         self.__map_rpm_to_prediction_index = interp1d([self.min_rpm, self.max_rpm],
-            [0, self.num_prediction_frames_to_use_steer - 1])
+            [3, self.num_prediction_frames_to_use_steer - 1])
         # self.__map_predict_angle_to_target_rpm = interp1d([0, 45], [self.max_rpm, self.min_rpm])
         self.__map_decel_rpm_to_throttle = interp1d([0, self.max_rpm - self.min_rpm], [0, -100.0])
         self.__map_accel_rpm_to_throttle = interp1d([0, self.max_rpm], [8.0, 30.0])
@@ -60,21 +62,22 @@ class Pilot:
         rospy.Subscriber('/car_command', String, self.car_command_callback)
         rospy.Subscriber("/camera/image/compressed", CompressedImage, self.camera_callback, queue_size=1)
 
-        self.command_publisher = rospy.Publisher('car_command', String, queue_size=10)
+        self.command_publisher = rospy.Publisher('car_command', String, queue_size=1)
+        self.shadow_publisher = rospy.Publisher('shadow_command', String, queue_size=1)
         self.info_publisher = rospy.Publisher('bus_comm', String, queue_size=10)
 
         self.info_publisher.publish("INF:Enable Auto mode to start pilot")
     
 
         #camera calibration
-        with open('/home/nvidia/code/ARCRacing/fisheye_f1p8_camera_calibration.pkl', 'rb') as f:
+        with open('/home/nvidia/code/ARCRacing/models/fisheye_f1p8_camera_calibration_protocol_2.pkl', 'rb') as f:
 
             calibration = pickle.load(f)
         
         self.mtx = calibration["mtx"]
         self.dist = calibration["dist"]
 
-        
+        self.frameCount = 0
 
 
 
@@ -115,9 +118,7 @@ class Pilot:
 
     # the image pipeline to apply before processing
     def pipeline(self, image):
-        undistort = cv2.undistort(image, self.mtx, self.dist, None, self.mtx)
-        output = undistort[100:180, :, :]
-        return output
+        return image[100:180,:,:]
 
     def car_command_callback(self, data):
         # look for autonmouse mode, only 
@@ -143,12 +144,15 @@ class Pilot:
             self.rpm = int(m[4:])
 
     def camera_callback(self, data):
+        #drop every other frame
+        self.frameCount ^= 1
+        image_seq_id = data.header.seq
         raw_image = self.cv_bridge.compressed_imgmsg_to_cv2(data, "rgb8")
         predctions = self.predict_steering_angle(raw_image)
 
-        if self.autonomous_mode:
-            self.set_steering(predctions)
-            self.set_rpm(predctions)
+        self.set_steering(predctions, image_seq_id)
+        self.set_rpm(predctions)
+            
 
     def predict_steering_angle(self, img):
         image_to_predict_on = self.pipeline(img)
@@ -168,19 +172,23 @@ class Pilot:
 
         return predctions
 
-    def set_steering(self, predctions):
+    def set_steering(self, predictions, image_seq_id):
         # use the predcition based on RPM, the faster we are going, the further in the 
         # future we need to look
         rpm_to_map = min(max(self.min_rpm, self.rpm), self.max_rpm)
-        print("rpm to map", rpm_to_map)
-        # prediction_index = int(self.map_rpm_to_prediction_index(rpm_to_map))
-        prediction_index = 3
+        prediction_index = int(self.map_rpm_to_prediction_index(rpm_to_map))
+        # prediction_index = 5
 
-        predicted_steering_angle = predctions[prediction_index]
+        predicted_steering_angle = predictions[prediction_index]
 
         # wrte this to the command bus
         message = "STR:{}".format(predicted_steering_angle)
-        self.command_publisher.publish(message)
+        if self.autonomous_mode:
+            self.command_publisher.publish(message)
+        else:
+            #publish the command to the shadow so we can look for weakness
+            message = "{}|{}".format(message, image_seq_id)
+            self.shadow_publisher.publish(message)
 
     def set_rpm(self, predictions):
         # the last predicted frame is what we use to set the target rpm
@@ -201,8 +209,18 @@ class Pilot:
             target_throttle = self.map_decel_rpm_to_throttle(abs_delta_rpm)
             message = "THR:{}".format(target_throttle)
 
-        print(message)
-        self.command_publisher.publish(message)
+        if self.autonomous_mode:
+            self.command_publisher.publish(message)
+        
+    def load_model(self, weights_file):
+        
+        with open("/home/nvidia/code/ARCRacing/models/model.yaml") as f:
+            model = model_from_yaml(f)
+
+        model.compile(loss="mse", optimizer="adam")
+        model.load_weights(weights_file)
+        
+        return model    
 
     def create_model(self):
         model = Sequential()
@@ -212,7 +230,7 @@ class Pilot:
         sensor_input = Input(shape=(1,), name='sensor_input', dtype='float32')
         
         # preprocess
-        X = Lambda(lambda x: x/255.0 - 0.5, input_shape=(80, 320, 3), name="lambda_1")(image_input)
+        X = Lambda(lambda x: x/255.0 - 0.5, name="lambda_1")(image_input)
         
         # conv1 layer
         X = Convolution2D(32, (5, 5), name="conv_1")(X)
