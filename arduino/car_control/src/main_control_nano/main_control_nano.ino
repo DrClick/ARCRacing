@@ -21,7 +21,7 @@
 #define THROTTLE_SENSITIVITY 3.0
 
 #define LED_GREEN 4
-#define LED_RED 3
+#define LED_RED 13
 
 #define RPM_PIN 2
 #define RPM_INTERRUPT 0
@@ -55,7 +55,7 @@ enum {
 CmdMessenger commander = CmdMessenger(Serial,',',';','/');
 
 float _STEER_BIAS = 0.0; //set this to adjust steering
-int _GOVERNER_F = 20; //cap the forward speed
+int _GOVERNER_F = 40; //cap the forward speed
 int _GOVERNER_R = -12;
 
 
@@ -280,9 +280,13 @@ void loop() {
 
   //decay rpms incase vehicle has stopped
   rpm_decay++;
-  if (rpm_decay >10){
+  if(rpm_decay == 30){
+    toggle_LED(LED_RED,false);
+  }
+  if (rpm_decay >60){
     rpm = 0;
     rpm_decay = 0;
+    toggle_LED(LED_RED,true);
     commander.sendBinCmd(cmd_rpm, rpm);
    }
  

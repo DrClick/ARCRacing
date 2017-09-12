@@ -1,2 +1,2 @@
 - setup-file:
-    local-name: /home/nvidia/code/ARCRacing/ros_system_ws/devel/setup.sh
+    local-name: /home/pi/code/ARCRacing/ros_system_ws/devel/setup.sh
