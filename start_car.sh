@@ -12,7 +12,6 @@ echo -e "            \e[1m\e[33m  / /_/ / /| |/ /    / //  |/ / / __  \e[21m";
 echo -e "            \e[1m\e[33m / _, _/ ___ / /____/ // /|  / /_/ /  \e[21m";
 echo -e "            \e[1m\e[33m/_/ |_/_/  |_\____/___/_/ |_/\____/   \e[21m";
 echo "                                      ";
-roslaunch vector79-jetson.launch &
-ssh pi@vector79-pi.local "bash -ic  'roslaunch code/ARCRacing/vector79-pi.launch'" &
-rosservice call /camera/start_capture
+
+roslaunch vector79-jetson.launch & ssh pi@vector79-pi.local "bash -ic  'roslaunch code/ARCRacing/vector79-pi.launch'" & rosservice call /camera/start_capture
 

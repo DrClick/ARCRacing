@@ -24,6 +24,17 @@ import json
 
 from time import time
 
+#evaluates x on a polynomial curve where the elements are decreasing powers of x 
+#[3,5,1,9] is a third degree polynomial in the y = 3x^3 + 5x^2 + 1x^1 + 9x^0
+def f_curve(x, curve):
+    output = 0
+    for i in range(len(curve)):
+        output += curve[-i -1] * x**i
+    return output
+
+def clamp(x, min_value, max_value):
+    return max(min_value, min(max_value, x))
+
 
 class Pilot:
     def __init__(self):
@@ -31,14 +42,17 @@ class Pilot:
         self.cv_bridge = CvBridge()
         self.max_steering_angle = 45
         self.rpm = 0
-        self.target_rpm = 1000 #JUMP OFF THE line
-        self.max_rpm = 2000
-        self.min_rpm = 300
+        self.target_rpm = 500 #JUMP OFF THE line
+        self.rpm_max = 3000
+        self.rpm_min = 80
+        self.rpm_max_predict = 1200 #after this rpm, look as far foward as possible
         self.num_prediction_frames = 30
+        self.throttle_min = 8
+        self.throttle_max = 35
 
         # might turn out to be too much prediction
         self.num_prediction_frames_to_use_rpm = 30
-        self.num_prediction_frames_to_use_steer = 10
+        self.num_prediction_frames_to_use_steer = 8
 
         # tf
         self.model = self.create_model()
@@ -46,14 +60,15 @@ class Pilot:
         self.graph = tf.get_default_graph()
 
         # maps
-        self.__map_rpm_to_prediction_index = interp1d([self.min_rpm, self.max_rpm],
+        self.__map_rpm_to_prediction_index_steer = interp1d([self.rpm_min, self.rpm_max],
             [3, self.num_prediction_frames_to_use_steer - 1])
-        # self.__map_predict_angle_to_target_rpm = interp1d([0, 45], [self.max_rpm, self.min_rpm])
-        self.__map_decel_rpm_to_throttle = interp1d([0, self.max_rpm - self.min_rpm], [0, -100.0])
-        self.__map_accel_rpm_to_throttle = interp1d([0, self.max_rpm], [8.0, 30.0])
-
+        self.__map_rpm_to_prediction_index_rpm = interp1d([0, self.rpm_max_predict],
+            [10, self.num_prediction_frames_to_use_rpm - 1])
+       
         #angle_to_rpm_curve
         self.set_angle_to_rpm_curve()
+        self.set_acceleration_rpm_to_throttle_curve()
+        self.set_deceleration_rpm_to_throttle_curve()
 
 
         # ros
@@ -77,43 +92,61 @@ class Pilot:
         self.mtx = calibration["mtx"]
         self.dist = calibration["dist"]
 
-        self.frameCount = 0
-
-
-
+        self.info_publisher.publish("INF:set auto mode for image prediction")
 
         rospy.spin()
 
     def set_angle_to_rpm_curve(self):
-        throttle_curve = [
-            (0, self.max_rpm), # at 0
-            (1, self.max_rpm * .99),
-            (10, self.max_rpm * .6),
-            (15, self.max_rpm * .4),
-            (35, self.min_rpm * 1.1),
-            (40, self.min_rpm),
-            (45, self.min_rpm)
-        ]
-        y = [x[1] for x in throttle_curve]
-        X = [x[0] for x in throttle_curve]
-        self.angle_to_rpm_curve = np.polyfit(X, y, 3)
+        #the precentage of RPM to use
+        y_fit = [3239,2637,2152,1766,1463,1227,1046,909,856,800,
+            780, 760, 740, 720, 700, 680, 660, 640, 620, 600, 
+            580, 560, 540, 520, 500, 480, 460, 440, 420, 400, 
+            380, 360, 340, 320, 300, 280, 260, 240, 220, 200,
+            180, 160, 140, 120, 100]
+        x_fit = np.arange(45)
+        self.angle_to_rpm_curve = np.polyfit(x_fit, y_fit, 6)
 
-    def map_rpm_to_prediction_index(self, rpm):
-        return self.__map_rpm_to_prediction_index(rpm)
+    def set_acceleration_rpm_to_throttle_curve(self):
+        y_fit = [0, .1, .2, .4, .5,  1]
+        x_fit = [0, 100,  500, 750, 1000, 1500]
+        self.acceleration_rpm_to_throttle_curve = np.polyfit(x_fit, y_fit, 3)
+
+    def set_deceleration_rpm_to_throttle_curve(self):
+        y_fit = [0, 0, .02, .03, .09,  .3,  .5, .8]
+        x_fit = [-10, 15,  25, 50, 200, 350, 500, 7000]
+        self.deceleration_rpm_to_throttle_curve = np.polyfit(x_fit, y_fit, 3)
+
+    def map_rpm_to_prediction_index_steer(self, rpm):
+        return int(self.__map_rpm_to_prediction_index_steer(rpm))
+
+    def map_rpm_to_prediction_index_rpm(self, rpm):
+        return int(self.__map_rpm_to_prediction_index_rpm(min(self.rpm_max_predict, rpm)))
 
     def map_predict_angle_to_target_rpm(self, angle):
         curve = self.angle_to_rpm_curve
-        rpm = curve[0]*angle**3 + curve[1]*angle**2 + curve[2]*angle + curve[3]
-        rpm = min(self.max_rpm, rpm)
-        rpm = max(self.min_rpm, rpm)
+        rpm = f_curve(angle, curve)
+        clamp(rpm, self.rpm_min, self.rpm_max)
+        print("mapped {} angle to {} target rpm".format(angle, rpm))
 
         return rpm
 
     def map_decel_rpm_to_throttle(self, rpm):
-        return self.__map_decel_rpm_to_throttle(rpm)
+        curve = self.deceleration_rpm_to_throttle_curve
+        throttle = f_curve(abs(rpm), curve) * 100
+
+        #return the breaking between 0 and -100
+        throttle =  -clamp(throttle, 0, 100)
+        print("mapped {} decelration rpm to {} target throttle".format(rpm, throttle))
+        return throttle
 
     def map_accel_rpm_to_throttle(self, rpm):
-        return self.__map_accel_rpm_to_throttle(rpm)
+        curve = self.acceleration_rpm_to_throttle_curve
+        throttle = f_curve(abs(rpm), curve) * self.throttle_max
+
+        #return the breaking between 0 and -100
+        throttle = clamp(throttle, self.throttle_min, self.throttle_max)
+        print("mapped {} accelration rpm to {} target throttle".format(rpm, throttle))
+        return throttle
 
 
     # the image pipeline to apply before processing
@@ -127,7 +160,7 @@ class Pilot:
 
         if (m.startswith("MOD")):
             self.autonomous_mode = True if m.split(":")[1] == "true" else False
-            self.info_publisher.publish("INF:set auto mode for image prediction")
+        
 
     """
     listen for the car to be triggered in manual mode and stop making predictions
@@ -144,8 +177,6 @@ class Pilot:
             self.rpm = int(m[4:])
 
     def camera_callback(self, data):
-        #drop every other frame
-        self.frameCount ^= 1
         image_seq_id = data.header.seq
         raw_image = self.cv_bridge.compressed_imgmsg_to_cv2(data, "rgb8")
         predctions = self.predict_steering_angle(raw_image)
@@ -175,11 +206,13 @@ class Pilot:
     def set_steering(self, predictions, image_seq_id):
         # use the predcition based on RPM, the faster we are going, the further in the 
         # future we need to look
-        rpm_to_map = min(max(self.min_rpm, self.rpm), self.max_rpm)
-        prediction_index = int(self.map_rpm_to_prediction_index(rpm_to_map))
+        rpm_to_map = min(max(self.rpm_min, self.rpm), self.rpm_max)
+        prediction_index = self.map_rpm_to_prediction_index_steer(rpm_to_map)
         # prediction_index = 5
 
         predicted_steering_angle = predictions[prediction_index]
+
+        print("Preicted turn angle is: {}".format(predicted_steering_angle))
 
         # wrte this to the command bus
         message = "STR:{}".format(predicted_steering_angle)
@@ -191,8 +224,9 @@ class Pilot:
             self.shadow_publisher.publish(message)
 
     def set_rpm(self, predictions):
-        # the last predicted frame is what we use to set the target rpm
-        predicted_future_steering_angle = predictions[self.num_prediction_frames_to_use_rpm - 1]
+        # look ahead up the max predicted frames based on linear map of steering angle
+        
+        predicted_future_steering_angle = predictions[self.map_rpm_to_prediction_index_rpm(self.rpm)]
 
         self.target_rpm = self.map_predict_angle_to_target_rpm(
             abs(min(predicted_future_steering_angle, self.max_steering_angle)))
