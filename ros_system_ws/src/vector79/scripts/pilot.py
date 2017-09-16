@@ -43,8 +43,8 @@ class Pilot:
         self.max_steering_angle = 45
         self.rpm = 0
         self.target_rpm = 1000 #JUMP OFF THE line
-        self.rpm_max = 1500
-        self.rpm_min = 200
+        self.rpm_max = 1800
+        self.rpm_min = 300
         self.rpm_max_predict = 2000 #after this rpm, look as far foward as possible
         self.num_prediction_frames = 30
         self.throttle_min = 8
