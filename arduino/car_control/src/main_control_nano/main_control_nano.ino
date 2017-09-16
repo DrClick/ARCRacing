@@ -1,9 +1,4 @@
-/*
-   Be sure to first calibrate the ESC. This program controls a Traxxas Slash 2 wheel drive
-   with XL5 speed controller
-*/
 #include <Servo.h>
-#include <NewPing.h>
 #include <CmdMessenger.h>
 
 #define STEER_IN 5
@@ -37,6 +32,11 @@
 #define MAX_DISTANCE 200 // Maximum distance (in cm) to ping.
 
 bool is_logging = true;
+
+//Use this flag to arm auto mode after holding the full brake for 5seconds and then toggeling full LEFT-RIGHT-LEFT-RIGHT
+//this allows rearming without logging in
+int set_auto_mode_on_release_brake_state = 0;
+
 
 /* Define available CmdMessenger commands */
 enum {
@@ -290,9 +290,46 @@ void loop() {
     commander.sendBinCmd(cmd_rpm, rpm);
    }
  
-
-  
+  //all commands must be when car is stopped
+  if (rpm==0){
+    read_commands_controller();
+  }
  
+}
+
+void read_commands_controller(){
+
+  //if we have reached the threshold, and at zero, then set auto mode and exit else reset and exit
+  if (abs(throttle_input - THROTTLE_BASE) < 20){
+    if (set_auto_mode_on_release_brake_state == 900){
+      enter_auto_mode();
+    }
+    else{
+      //reset the state
+      set_auto_mode_on_release_brake_state = 0;
+    }
+    return;
+  }
+  
+  //exit if not full braking
+  if (throttle_input > (THROTTLE_MIN + 50)) return;
+
+  //incrament up to 100 then exit(this forces the brake on for a while
+  if (set_auto_mode_on_release_brake_state < 500){set_auto_mode_on_release_brake_state += 1; return;}
+
+  //read a left input
+  if (steer_input < (STEER_MIN + 50)){
+    if (set_auto_mode_on_release_brake_state == 500){set_auto_mode_on_release_brake_state == 600; return;}
+    if (set_auto_mode_on_release_brake_state == 700){set_auto_mode_on_release_brake_state == 800; return;}
+    return;
+  }
+
+  //read a left input
+  if (steer_input < (STEER_MIN + 50)){
+    if (set_auto_mode_on_release_brake_state == 600){set_auto_mode_on_release_brake_state == 700; return;}
+    if (set_auto_mode_on_release_brake_state == 800){set_auto_mode_on_release_brake_state == 900; return;}
+    return;
+  }  
 }
 
 

@@ -47,6 +47,7 @@ LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 String inputString = "";         // a String to hold incoming data
 boolean stringComplete = false;  // whether the string is complete
 
+float system_voltage = -1;
 
 void setup() {
   Serial.begin(115200);
@@ -68,14 +69,18 @@ void setup() {
   lcd.setCursor(0,2);
   lcd.write("S:        T:        ");
   lcd.setCursor(0,3);
-  lcd.write("IN:   V  TEMP:    C ");
+  lcd.write("IN:99.9V    RPM:9999");
 }
 
 void loop() {
+  if (system_voltage > -1 && system_voltage < 11){
+    alarm();
+  }
+  
   if (stringComplete) {
     //message are in the form K - Message
     //where K is
-    //P - Temp
+    //R - RPM
     //I - IP
     //S - Steering
     //T - Throttle
@@ -90,21 +95,28 @@ void loop() {
     Serial.println(first);
     Serial.println(message);
     switch (first) {
-      case 'P':
-        lcd.setCursor(15,3);
+      case 'R':
+        lcd.setCursor(16,3);
+        message = message.substring(0,4);
         break;
       case 'V':
-        lcd.setCursor(4,3);
+        lcd.setCursor(3,3);
+        system_voltage = message.toFloat();
+        Serial.println(system_voltage);
+        message = message.substring(0,4);
         break;
       case 'I':
         lcd.setCursor(0, 1);
         message = "IP: " + message;
+        message = message.substring(0,20);
         break;
       case 'S':
-        lcd.setCursor(3, 2);
+        lcd.setCursor(2, 2);
+        message = message.substring(0,5);
         break;
       case 'T':
         lcd.setCursor(13, 2);
+        message = message.substring(0,6);
         break;
       case '1':
         lcd.setCursor(0,0);
@@ -118,8 +130,7 @@ void loop() {
         break;
         
       default: 
-        // if nothing else matches, do the default
-        // default is optional
+        message = "";
       break;
     }
     lcd.print(message);
@@ -130,6 +141,11 @@ void loop() {
   }
 }
 
+void alarm(){
+  noTone(3);
+  tone(3, 2800, 200);
+  delay(200);
+}
 
 void serialEvent() {
   while (Serial.available()) {
