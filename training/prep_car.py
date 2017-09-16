@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.misc import imread
-import pickle
+import cPickle as pickle
 import cv2
 import sys
 import csv
@@ -40,7 +40,7 @@ def extract_data(folder):
 S_train, X_train, XX_train, y_train = extract_data(folder_to_process)
 
 #clean up the beginning and the end of the clip
-data_frames_to_drop = [(0,200), (-300, -1)]
+data_frames_to_drop = [(0,200), (-1000, -1)]
 clean_indicies = np.ones(len(X_train))
 for r in data_frames_to_drop:
     clean_indicies[r[0]:r[1]] = 0

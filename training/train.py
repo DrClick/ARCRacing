@@ -10,7 +10,7 @@ from keras.layers import concatenate, Input
 from keras.models import Model
 from keras.layers.convolutional import Convolution2D
 from keras.layers.pooling import MaxPooling2D
-import pickle
+import cPickle as pickle
 import json
 import sys
 
@@ -23,8 +23,8 @@ print("./train.py ~/code/ARCRacing/models/office_set_predict_ahead_90_19.h5 sept
 
 starting_model = sys.argv[1]
 base_output_model =  sys.argv[2]
-input_file = sys.argv[3]
-num_iterations = int(sys.argv[4])
+#input_file = sys.argv[3]
+num_iterations = int(sys.argv[3])
 
 
 #we want to predict the steering angle for the next second of video. Here we 
@@ -35,7 +35,7 @@ num_predict_ahead_frames = num_predict_ahead_frames_to_use//predict_ahead_step_r
 
 
 
-drives = [input_file]
+drives = ['V79_run_warehouse_1.pkl',"V79_run_warehouse_2.pkl"]
 for drive in drives:
     with open('{}'.format(drive), 'rb') as f:
         # data = pickle.load(f,encoding='latin1') #if loading from python 3

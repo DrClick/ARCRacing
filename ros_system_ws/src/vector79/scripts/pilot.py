@@ -42,13 +42,13 @@ class Pilot:
         self.cv_bridge = CvBridge()
         self.max_steering_angle = 45
         self.rpm = 0
-        self.target_rpm = 500 #JUMP OFF THE line
-        self.rpm_max = 4000
+        self.target_rpm = 1000 #JUMP OFF THE line
+        self.rpm_max = 1500
         self.rpm_min = 200
         self.rpm_max_predict = 2000 #after this rpm, look as far foward as possible
         self.num_prediction_frames = 30
         self.throttle_min = 8
-        self.throttle_max = 40
+        self.throttle_max = 20
 
         # might turn out to be too much prediction
         self.num_prediction_frames_to_use_rpm = 30
@@ -56,7 +56,7 @@ class Pilot:
 
         # tf
         self.model = self.create_model()
-        self.model.load_weights("/home/nvidia/code/ARCRacing/models/prerace_4.h5")
+        self.model.load_weights("/home/nvidia/code/ARCRacing/models/at_warehouse_0.h5")
         self.graph = tf.get_default_graph()
 
         # map how far ahead to look in the prediction for actual steering
@@ -65,7 +65,7 @@ class Pilot:
 
         # map how far ahead to look for the curvature of the road to set rpm
         self.__map_rpm_to_prediction_index_rpm = interp1d([0, self.rpm_max_predict],
-            [20, self.num_prediction_frames_to_use_rpm - 1])
+            [29, self.num_prediction_frames_to_use_rpm - 1])
        
         #angle_to_rpm_curve
         self.set_angle_to_rpm_curve()
@@ -100,11 +100,11 @@ class Pilot:
 
     def set_angle_to_rpm_curve(self):
         #the precentage of RPM to use
-        y_fit = [3239,2637,2152,1766,1463,1227,1046,909,856,800,
-            780, 760, 740, 720, 700, 680, 660, 640, 620, 600, 
-            584, 568, 552, 536, 520, 504, 488, 472, 456, 440, 
-            424, 408, 392, 376, 360, 344, 328, 312, 296, 280, 
-            264, 248, 232, 216, 200]
+        y_fit = [3500,3200,2952,2566,1963,1527,1346,1209,1156,1000,
+         982, 964, 946, 928, 910, 892, 874, 856, 838, 820, 
+         802, 784, 766, 748, 730, 712, 694, 676, 658, 640, 
+         622, 604, 586, 568, 550, 532, 514, 496, 478, 460, 
+         442, 424, 406, 388, 370]
         x_fit = np.arange(45)
         self.angle_to_rpm_curve = np.polyfit(x_fit, y_fit, 6)
 
@@ -237,7 +237,7 @@ class Pilot:
         predicted_future_steering_angle = total_steer/num_look_ahead_frames
 
         #increase this value based on rpm
-        rpm_factor = 1 + self.rpm/(self.rpm_max + self.rpm_min)
+        rpm_factor = 1 + 6* self.rpm/(self.rpm_max + self.rpm_min)
 
         predicted_future_steering_angle = rpm_factor * predicted_future_steering_angle
         predicted_future_steering_angle = clamp(predicted_future_steering_angle, 0, 45)
