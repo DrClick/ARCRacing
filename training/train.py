@@ -26,27 +26,6 @@ base_output_model =  sys.argv[2]
 input_file = sys.argv[3]
 num_iterations = int(sys.argv[4])
 
-drives = ['V79_run_office_6.pkl']
-for drive in drives:
-    with open('{}'.format(drive), 'rb') as f:
-        data = pickle.load(f)
-            
-    X_train.extend(data['images'])
-    S_train.extend(data['sensors']) #RPM, throttle
-    y_train.extend(data['steering_throttle'].astype(np.float64))
-    
-    #flip left to right
-    X_train.extend(np.array([np.fliplr(x) for x in data['images']]))
-    S_train.extend(data['sensors']) #RPM, throttle
-    y_train.extend(np.negative(data['steering_throttle'].astype(np.float64)))
-    
-X_train = np.array(X_train)
-S_train = np.array(S_train)
-y_train = np.array(y_train)[:,[0]]
-
-
-print("Shape of input", X_train.shape, S_train.shape, y_train.shape)
-
 
 #we want to predict the steering angle for the next second of video. Here we 
 #skip each 3 frames and predict on them
@@ -55,30 +34,45 @@ predict_ahead_step_rate = 3
 num_predict_ahead_frames = num_predict_ahead_frames_to_use//predict_ahead_step_rate
 
 
-# go through and create a vectors for look ahead, let try though 10
-steering_buffer = list(y_train[:num_predict_ahead_frames_to_use])
-yy_train = []
 
-for y in y_train[num_predict_ahead_frames_to_use:]:
-    yy_train.append(steering_buffer[::predict_ahead_step_rate])
-    steering_buffer.append(y)
-    steering_buffer = steering_buffer[1:]
+drives = [input_file]
+for drive in drives:
+    with open('{}'.format(drive), 'rb') as f:
+        # data = pickle.load(f,encoding='latin1') #if loading from python 3
+        data = pickle.load(f)
+        
+    X, S, Y = (data['images'], 
+        data['sensors'], 
+        data['steering_throttle'].astype(np.float64))
+    X_train.extend(X) #images
+    S_train.extend(S) #sensors
+    y_train.extend(Y) #steering
+    
+#     #flip left to right for augmented data
+#     X, S, Y = (np.array([np.fliplr(x) for x in data['images']]),
+#         data['sensors'],
+#         np.negative(data['steering_throttle'].astype(np.float64)))
+               
+#     X_train.extend(X) #images
+#     S_train.extend(S) #sensors
+#     y_train.extend(Y) #steering
+    
+X_train = np.array(X_train)
+S_train = np.array(S_train)
+y_train = np.array(y_train)
 
-
-X_train = X_train[:-num_predict_ahead_frames_to_use]
-S_train = S_train[:-num_predict_ahead_frames_to_use]
-y_train = y_train[:-num_predict_ahead_frames_to_use]
-yy_train = np.array(yy_train)
-
-print("shape after looking ahead", X_train.shape, S_train.shape, yy_train.shape)
+print("Shape of inputs", X_train.shape, S_train.shape, y_train.shape)
 
 
 def create_model():
     model = Sequential()
     
+    #inputs
     image_input = Input(shape=(80, 320, 3), name='image_input', dtype='float32')
+    sensor_input = Input(shape=(1,), name='sensor_input', dtype='float32')
+    
     # preprocess
-    X = Lambda(lambda x: x/255.0 - 0.5, input_shape=(80, 320, 3), name="lambda_1")(image_input)
+    X = Lambda(lambda x: x/255.0 - 0.5, name="lambda_1")(image_input)
     
     # conv1 layer
     X = Convolution2D(32, (5, 5), name="conv_1")(X)
@@ -102,6 +96,10 @@ def create_model():
 
     #add fully connected layers
     X = Flatten(name="flat_1")(X)
+    
+    #add in the speed, here we may add in other variables such 
+    # as the last several throttle / speed/ steering angles, and other sensors
+    X = concatenate([X, sensor_input], name="concate_1")
     
     # fc1
     X = Dense(1024, name="dnse_1")(X)
@@ -127,7 +125,7 @@ def create_model():
     
 
     #model = Model(inputs=[image_input, sensor_input], outputs=[steer_output, throttle_output])
-    model = Model(inputs=[image_input], outputs=steer_outputs)
+    model = Model(inputs=[image_input, sensor_input], outputs=steer_outputs)
 
     loss_def = {"steer_output_{}".format(i) : "mse" for i in range(num_predict_ahead_frames)}
     loss_weight_def = {"steer_output_{}".format(i) : 1.0 for i in range(num_predict_ahead_frames)}
@@ -140,18 +138,21 @@ def create_model():
 
 #create the model and save it as json
 model = create_model()
-model.load_weights("../models/{}".format(starting_model))  #<--last run
+model.load_weights("/home/nvidia/code/ARCRacing/models/{}".format(starting_model))  #<--last run
 
 
-y_output = {"steer_output_{}".format(i) : yy_train[:,i,:] for i in range(num_predict_ahead_frames)}
+y_output = {"steer_output_{}".format(i) : y_train[:,i] for i in range(num_predict_ahead_frames)}
 
 hist = []
-for i in range(0,num_iterations):
+for i in range(0,10):
     print("{} --------------".format(i))
-    h = model.fit({'image_input': X_train,},y_output, 
-                  shuffle=True, epochs=5, validation_split=.3, batch_size=64)
-    hist.append(h)
-    model.save("{}_{}.h5".format(base_output_model, i))
+    h = model.fit({'image_input': X_train, 'sensor_input': S_train[:,0]}, y_output, 
+                  shuffle=True, epochs=10, validation_split=.3, batch_size=128)
+    hist.append(h.history)
+    with open('/home/nvidia/code/ARCRacing/models/history_{}.json'.format(base_output_model), 'w') as f:
+            json.dump(hist, f)
+            
+    model.save("/home/nvidia/code/ARCRacing/models/{}_{}.h5".format(base_output_model, i))
     
 print("done, go race")
 

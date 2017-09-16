@@ -43,27 +43,29 @@ class Pilot:
         self.max_steering_angle = 45
         self.rpm = 0
         self.target_rpm = 500 #JUMP OFF THE line
-        self.rpm_max = 3000
-        self.rpm_min = 80
-        self.rpm_max_predict = 1200 #after this rpm, look as far foward as possible
+        self.rpm_max = 4000
+        self.rpm_min = 200
+        self.rpm_max_predict = 2000 #after this rpm, look as far foward as possible
         self.num_prediction_frames = 30
         self.throttle_min = 8
-        self.throttle_max = 35
+        self.throttle_max = 40
 
         # might turn out to be too much prediction
         self.num_prediction_frames_to_use_rpm = 30
-        self.num_prediction_frames_to_use_steer = 8
+        self.num_prediction_frames_to_use_steer = 6
 
         # tf
         self.model = self.create_model()
-        self.model.load_weights("/home/nvidia/code/ARCRacing/models/shadow_2.h5")
+        self.model.load_weights("/home/nvidia/code/ARCRacing/models/prerace_4.h5")
         self.graph = tf.get_default_graph()
 
-        # maps
+        # map how far ahead to look in the prediction for actual steering
         self.__map_rpm_to_prediction_index_steer = interp1d([self.rpm_min, self.rpm_max],
             [3, self.num_prediction_frames_to_use_steer - 1])
+
+        # map how far ahead to look for the curvature of the road to set rpm
         self.__map_rpm_to_prediction_index_rpm = interp1d([0, self.rpm_max_predict],
-            [10, self.num_prediction_frames_to_use_rpm - 1])
+            [20, self.num_prediction_frames_to_use_rpm - 1])
        
         #angle_to_rpm_curve
         self.set_angle_to_rpm_curve()
@@ -100,15 +102,15 @@ class Pilot:
         #the precentage of RPM to use
         y_fit = [3239,2637,2152,1766,1463,1227,1046,909,856,800,
             780, 760, 740, 720, 700, 680, 660, 640, 620, 600, 
-            580, 560, 540, 520, 500, 480, 460, 440, 420, 400, 
-            380, 360, 340, 320, 300, 280, 260, 240, 220, 200,
-            180, 160, 140, 120, 100]
+            584, 568, 552, 536, 520, 504, 488, 472, 456, 440, 
+            424, 408, 392, 376, 360, 344, 328, 312, 296, 280, 
+            264, 248, 232, 216, 200]
         x_fit = np.arange(45)
         self.angle_to_rpm_curve = np.polyfit(x_fit, y_fit, 6)
 
     def set_acceleration_rpm_to_throttle_curve(self):
-        y_fit = [0, .1, .2, .4, .5,  1]
-        x_fit = [0, 100,  500, 750, 1000, 1500]
+        y_fit = [0, .1, .2, .3, .4,  1]
+        x_fit = [0, 100,  500, 750, 1000, 2200]
         self.acceleration_rpm_to_throttle_curve = np.polyfit(x_fit, y_fit, 3)
 
     def set_deceleration_rpm_to_throttle_curve(self):
@@ -225,8 +227,20 @@ class Pilot:
 
     def set_rpm(self, predictions):
         # look ahead up the max predicted frames based on linear map of steering angle
-        
-        predicted_future_steering_angle = predictions[self.map_rpm_to_prediction_index_rpm(self.rpm)]
+        num_look_ahead_frames = self.map_rpm_to_prediction_index_rpm(self.rpm)
+        # this curve empahsis large turns and deimphasises very small ones, the inflection
+        # point is 18 degrees
+        total_steer = sum([(x/4)**2 - (x/16)**4 for x in predictions[:num_look_ahead_frames]])
+
+        #originally I just looked at one frame, the idea here is to 
+        #take the total amount of turning into account
+        predicted_future_steering_angle = total_steer/num_look_ahead_frames
+
+        #increase this value based on rpm
+        rpm_factor = 1 + self.rpm/(self.rpm_max + self.rpm_min)
+
+        predicted_future_steering_angle = rpm_factor * predicted_future_steering_angle
+        predicted_future_steering_angle = clamp(predicted_future_steering_angle, 0, 45)
 
         self.target_rpm = self.map_predict_angle_to_target_rpm(
             abs(min(predicted_future_steering_angle, self.max_steering_angle)))
