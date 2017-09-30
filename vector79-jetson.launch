@@ -16,5 +16,5 @@
 	<node pkg="tf" type="static_transform_publisher" name="base_link_2_base_stabilized_link" args="0 0 0 0 0 0 /base_link /base_stabilized 100"/>
 	<node pkg="tf" type="static_transform_publisher" name="base_stablized_2_base_frame" args="0 0 0 0 0 0 /base_stabilized /base_frame 100"/>
 	<node pkg="tf" type="static_transform_publisher" name="base_2_nav_link" args="0 0 0 0 0 0 /base_frame /nav 100"/>
-	<node pkg="tf" type="static_transform_publisher" name="base_frame_2_laser_link" args=".04 0 .26 0 0 0 /base_frame /neato_laser 100"/>
+	<node pkg="tf" type="static_transform_publisher" name="base_frame_2_laser_link" args=".04 0 .20 0 0 0 /base_frame /neato_laser 100"/>
 </launch>

@@ -2,10 +2,13 @@
 <robot name="myfirst">
   <link name="base_link">
     <visual>
-      <geometry>
+     <!--  <geometry>
 		<box size="0.56 0.3 0.22"/>
-      </geometry>
-      <origin xyz="0 0 .11"/>
+      </geometry> -->
+      <geometry>
+   		<mesh filename="package://vector79/traxxas.dae"/>
+   	  </geometry>
+      <origin xyz="0 0 0"/>
     </visual>
   </link>
 </robot>

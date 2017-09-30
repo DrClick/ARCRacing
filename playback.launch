@@ -1,0 +1,13 @@
+<launch>
+    <param name="robot_description" command="cat $(find vector79)/traxxas.urdf" />
+    <param name="use_sim_time" value="true" />
+    <node pkg="rviz" type="rviz" name="rviz"/>
+    <!-- TF publish-->
+	<node pkg="tf" type="static_transform_publisher" name="world_2_map" args="0 0 0 0 0 0  /world /map 100" />
+	<node pkg="tf" type="static_transform_publisher" name="map_2_base_footprint" args="0 0 0 0 0 0 /map /base_footprint 100"/>
+	<node pkg="tf" type="static_transform_publisher" name="base_footprint_2_base_link" args="0 0 0 0 0 0 /base_footprint /base_link 100"/>
+	<node pkg="tf" type="static_transform_publisher" name="base_link_2_base_stabilized_link" args="0 0 0 0 0 0 /base_link /base_stabilized 100"/>
+	<node pkg="tf" type="static_transform_publisher" name="base_stablized_2_base_frame" args="0 0 0 0 0 0 /base_stabilized /base_frame 100"/>
+	<node pkg="tf" type="static_transform_publisher" name="base_2_nav_link" args="0 0 0 0 0 0 /base_frame /nav 100"/>
+	<node pkg="tf" type="static_transform_publisher" name="base_frame_2_laser_link" args=".04 0 .20 0 0 0 /base_frame /neato_laser 100"/>
+</launch>
