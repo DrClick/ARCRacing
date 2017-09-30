@@ -14,14 +14,14 @@ def voltage_monitor():
     while True:
         time.sleep(10)
         input_voltage = subprocess.check_output(['cat','/sys/bus/i2c/devices/0-0040/iio_device/in_voltage0_input']).rstrip()
-        voltage = round(int(input_voltage)/1000,2)
+        voltage = round(float(input_voltage)/1000,2)
         msg = "VLT:{}".format(voltage)
         rospy.loginfo(rospy.get_caller_id() + '%s', msg)
         info_pub.publish(msg)
         voltage_pub.publish(voltage)
 
         if voltage < 11.2:
-            msg = "WRN:LOW-VOLTAGE: {}".format(voltage)
+            msg = "WRN:LOW-VOLTAGE {}".format(voltage)
             info_pub.publish(msg)
 
 if __name__ == '__main__':
